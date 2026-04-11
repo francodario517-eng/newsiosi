@@ -42,50 +42,65 @@ function App() {
   const [editingOperation, setEditingOperation] = useState(null)
 
   const stockVehicles = useMemo(() => {
-    const entries = [];
-    const exits = new Set();
+    const entryMap = new Map(); // identifier -> entry data[]
+    const exitCounts = new Map(); // identifier -> count
 
     operations.forEach(op => {
       const isVenta = op.operation_type.toLowerCase() === 'venta';
       const isCompra = op.operation_type.toLowerCase() === 'compra';
       const isRescision = op.operation_type.toLowerCase() === 'rescisión';
 
-      // 1. Record Exits (Principal vehicle of a Venta OR Trade-in of a Compra)
+      // Record Exits
       op.vehicles.forEach(v => {
         const isPrincipalExit = isVenta && v.role === 'principal';
         const isTradeInExit = isCompra && v.role === 'parte_pago';
         
         if (isPrincipalExit || isTradeInExit) {
           const id = (v.chasis || v.chapa || '').trim().toUpperCase();
-          if (id) exits.add(id);
+          if (id) {
+            exitCounts.set(id, (exitCounts.get(id) || 0) + 1);
+          }
         }
       });
 
-      // 2. Record Entries (Principal of a Compra OR Trade-in of a Venta)
+      // Record Entries
       op.vehicles.forEach(v => {
         const isPrincipalEntry = (isCompra || isRescision) && v.role === 'principal';
         const isTradeInEntry = isVenta && v.role === 'parte_pago';
         
         if (isPrincipalEntry || isTradeInEntry) {
-          entries.push({
-            description: v.description,
-            chapa: v.chapa,
-            chasis: v.chasis,
-            valuation: v.role === 'principal' ? op.total_amount : (v.valuation || 0),
-            entry_date: op.date,
-            source_type: isPrincipalEntry ? (isRescision ? 'RESCISIÓN' : 'COMPRA') : 'PARTE PAGO RECIBIDO',
-            operation_id: op.id
-          });
+          const id = (v.chasis || v.chapa || '').trim().toUpperCase();
+          if (id) {
+            if (!entryMap.has(id)) entryMap.set(id, []);
+            entryMap.get(id).push({
+              description: v.description,
+              chapa: v.chapa,
+              chasis: v.chasis,
+              valuation: v.role === 'principal' ? op.total_amount : (v.valuation || 0),
+              entry_date: op.date,
+              source_type: isPrincipalEntry ? (isRescision ? 'RESCISIÓN' : 'COMPRA') : 'PARTE PAGO RECIBIDO',
+              operation_id: op.id
+            });
+          }
         }
       });
     });
 
-    // 3. Filter out entries that have a corresponding exit
-    return entries.filter(entry => {
-      const entryId = (entry.chasis || entry.chapa || '').trim().toUpperCase();
-      if (!entryId) return true;
-      return !exits.has(entryId);
+    const activeStock = [];
+    entryMap.forEach((entries, id) => {
+      const exits = exitCounts.get(id) || 0;
+      // If we have more entries than exits, the REMAINING ones are in stock
+      // Typically the most recent ones.
+      if (entries.length > exits) {
+        // We take the difference
+        const countInStock = entries.length - exits;
+        // Add the last 'n' entries back to stock
+        const remaining = entries.slice(-countInStock);
+        activeStock.push(...remaining);
+      }
     });
+
+    return activeStock;
   }, [operations]);
   const [tradeInVehicles, setTradeInVehicles] = useState([])
 
