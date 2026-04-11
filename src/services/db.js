@@ -189,7 +189,7 @@ export const db = {
               chasis: t.chasis
             }))
         },
-        position: { x: index * 600, y: 50 }
+        position: { x: index * 700, y: 50 }
       });
 
       if (op.parent_id) {
@@ -197,9 +197,9 @@ export const db = {
           id: `e-node-${op.parent_id}-${nodeId}`, 
           source: `node-${op.parent_id}`, 
           target: nodeId, 
-          animated: true,
-          type: 'smoothstep',
-          style: { stroke: 'var(--primary)', strokeWidth: 2 }
+          animated: false,
+          type: 'step',
+          style: { stroke: '#aa3bff', strokeWidth: 3 }
         });
       }
     });
