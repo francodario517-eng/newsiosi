@@ -26,16 +26,16 @@ import { supabase } from './services/db'
 import * as XLSX from 'xlsx'
 
 function App() {
-  const [activeTab, setActiveTab] = useState('operations')
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'operations')
   const [selectedTraceability, setSelectedTraceability] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [stats, setStats] = useState({ totalProfit: 0, tradeInCount: 0 })
-  const [searchQuery, setSearchQuery] = useState('')
-  const [period, setPeriod] = useState('all') 
+  const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('searchQuery') || '')
+  const [period, setPeriod] = useState(() => localStorage.getItem('period') || 'all') 
   const [customRange, setCustomRange] = useState({ start: '', end: '' })
   const [operations, setOperations] = useState([])
   const [preFilledData, setPreFilledData] = useState(null)
-  const [highlightedId, setHighlightedId] = useState(null)
+  const [highlightedId, setHighlightedId] = useState(() => localStorage.getItem('highlightedId') || null)
   const [isTreeLoading, setIsTreeLoading] = useState(false)
   const [session, setSession] = useState(null)
   const [editingOperation, setEditingOperation] = useState(null)
@@ -61,6 +61,27 @@ function App() {
     loadOps();
     return db.subscribe(loadOps);
   }, [])
+
+  // Persist basic state
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+    localStorage.setItem('searchQuery', searchQuery);
+    localStorage.setItem('period', period);
+    if (highlightedId) localStorage.setItem('highlightedId', highlightedId);
+    else localStorage.removeItem('highlightedId');
+  }, [activeTab, searchQuery, period, highlightedId]);
+
+  // Restore traceability if there was a highlighted vehicle
+  useEffect(() => {
+    if (activeTab === 'tree' && highlightedId && operations.length > 0 && !selectedTraceability && !isTreeLoading) {
+      // Find a vehicle from any operation that matches the highlightedId (which we use as vehicle identifier)
+      // Actually, handleSelectOperation expects the operation object.
+      const op = operations.find(o => o.id === highlightedId || o.vehicles.some(v => v.chasis === highlightedId || v.chapa === highlightedId));
+      if (op) {
+        handleSelectOperation(op);
+      }
+    }
+  }, [operations, activeTab]);
 
   const handleSelectOperation = async (op) => {
     const vehicleId = op.vehicles[0]?.chasis || op.vehicles[0]?.chapa || op.vehicles[0]?.id || op.vehicles[0]?.identifier;
