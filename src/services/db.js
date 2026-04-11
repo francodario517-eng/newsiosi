@@ -86,6 +86,7 @@ export const db = {
   },
 
   getVehicleTraceability: async (vehicleId) => {
+    // 1. Find all operations where this vehicle is present
     const { data: vehMatches } = await supabase
       .from('vehicles')
       .select('operation_id')
@@ -93,20 +94,53 @@ export const db = {
 
     if (!vehMatches || vehMatches.length === 0) return { nodes: [], edges: [] };
 
-    const opIds = vehMatches.map(m => m.operation_id);
+    // 2. We need to find the ABSOLUTE ROOT of these operations to show the full history
+    const allOpsInChainSet = new Set();
+    
+    // Fetch all potentially involved operations to trace roots locally (more efficient than 20 queries)
+    const { data: allOps } = await supabase.from('operations').select('*');
+    
+    const findRootId = (opId) => {
+      const op = allOps.find(o => o.id === opId);
+      if (!op || !op.parent_id) return opId;
+      return findRootId(op.parent_id);
+    };
+
+    const rootIds = [...new Set(vehMatches.map(m => findRootId(m.operation_id)))];
+
+    // 3. Get all descendants of these roots to build the complete genealogy
+    const getDescendants = (parentId) => {
+      const children = allOps.filter(o => o.parent_id === parentId);
+      let results = [...children];
+      children.forEach(child => {
+          results = [...results, ...getDescendants(child.id)];
+      });
+      return results;
+    };
+
+    const fullGenealogyIds = new Set();
+    rootIds.forEach(rid => {
+      fullGenealogyIds.add(rid);
+      getDescendants(rid).forEach(d => fullGenealogyIds.add(d.id));
+    });
+
+    // 4. Fetch full details for the entire genealogy
     const { data: ops } = await supabase
       .from('operations')
       .select('*, vehicles(*)')
-      .in('id', opIds)
+      .in('id', Array.from(fullGenealogyIds))
       .order('date', { ascending: true });
 
     const nodes = [];
     const edges = [];
-    let lastNodeId = null;
-
+    
     ops.forEach((op, index) => {
       const nodeId = `node-${op.id}`;
-      const v = op.vehicles.find(veh => veh.chasis === vehicleId || veh.chapa === vehicleId);
+      // For this node, show the vehicle they searched for OR the principal vehicle
+      const searchedV = op.vehicles.find(veh => veh.chasis === vehicleId || veh.chapa === vehicleId);
+      const principalV = op.vehicles.find(veh => veh.role === 'principal');
+      const displayV = searchedV || principalV;
+      
       const tradeIn = op.vehicles.find(veh => veh.role === 'parte_pago');
 
       nodes.push({
@@ -116,11 +150,11 @@ export const db = {
           operation_id: op.id,
           operation_type: op.operation_type,
           payment_type: op.payment_type,
-          date: new Date(op.date).toLocaleDateString('es-PY'),
+          date: new Date(op.date).toLocaleDateString('es-PY', { timeZone: 'UTC' }),
           client_name: op.buyer,
-          vehicle_description: v?.description || vehicleId,
-          chapa: v?.chapa || '',
-          chasis: v?.chasis || '',
+          vehicle_description: displayV?.description || 'Operación de Sistema',
+          chapa: displayV?.chapa || '',
+          chasis: displayV?.chasis || '',
           currency: op.currency,
           total_amount: op.total_amount,
           delivery_amount: op.delivery_amount,
@@ -136,10 +170,14 @@ export const db = {
         position: { x: index * 450, y: 150 + (index % 2 === 0 ? 0 : 50) }
       });
 
-      if (lastNodeId) {
-        edges.push({ id: `e-${lastNodeId}-${nodeId}`, source: lastNodeId, target: nodeId, animated: true });
+      if (op.parent_id) {
+        edges.push({ 
+          id: `e-node-${op.parent_id}-${nodeId}`, 
+          source: `node-${op.parent_id}`, 
+          target: nodeId, 
+          animated: true 
+        });
       }
-      lastNodeId = nodeId;
     });
 
     return { nodes, edges };
