@@ -181,6 +181,19 @@ export const db = {
 
     roots.forEach(r => setDepth(r.id, 0));
 
+    // Identify which vehicles in this chain already have a descendant (sold)
+    const soldInChain = new Set();
+    ops.forEach(op => {
+      if (op.parent_id) {
+        // The principal vehicle of a child operation is the one that was sold from the parent
+        const principal = op.vehicles.find(v => v.role === 'principal');
+        if (principal) {
+          const id = (principal.chasis || principal.chapa || '').trim().toUpperCase();
+          if (id) soldInChain.add(`${op.parent_id}-${id}`);
+        }
+      }
+    });
+
     // Final sort and position assignment
     const sortedOps = Array.from(opMap.values()).sort((a, b) => a.depth - b.depth);
     const depthCounts = {};
@@ -194,6 +207,9 @@ export const db = {
       const searchedV = op.vehicles.find(veh => veh.chasis === vehicleId || veh.chapa === vehicleId);
       const principalV = op.vehicles.find(veh => veh.role === 'principal');
       const displayV = searchedV || principalV;
+      
+      const principalId = (displayV?.chasis || displayV?.chapa || '').trim().toUpperCase();
+      const isPrincipalSold = principalId ? soldInChain.has(`${op.id}-${principalId}`) : false;
 
       nodes.push({
         id: nodeId,
@@ -207,6 +223,7 @@ export const db = {
           vehicle_description: displayV?.description || 'Operación de Sistema',
           chapa: displayV?.chapa || '',
           chasis: displayV?.chasis || '',
+          isPrincipalSold,
           currency: op.currency,
           total_amount: op.total_amount,
           delivery_amount: op.delivery_amount,
@@ -218,7 +235,8 @@ export const db = {
               description: t.description,
               amount: t.valuation,
               chapa: t.chapa,
-              chasis: t.chasis
+              chasis: t.chasis,
+              isSold: (t.chasis || t.chapa) ? soldInChain.has(`${op.id}-${(t.chasis || t.chapa || '').trim().toUpperCase()}`) : false
             }))
         },
         position: { x: depth * 750, y: vIdx * 500 + 50 }

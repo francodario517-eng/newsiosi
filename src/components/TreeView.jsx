@@ -66,25 +66,27 @@ const VehicleNode = ({ data }) => {
           <a href="#" style={{ color: '#60a5fa', textDecoration: 'underline', marginBottom: '2px', display: 'block' }}>
             {data.vehicle_description}
           </a>
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              if (data.onAddBranch) data.onAddBranch({
-                description: data.vehicle_description,
-                chapa: data.chapa,
-                chasis: data.chasis,
-                operation_id: data.operation_id
-              });
-            }}
-            title="Crear rama desde este vehículo"
-            style={{ 
-              background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', 
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-              padding: 0, color: 'white', flexShrink: 0
-            }}
-          >
-            <PlusCircle size={12} />
-          </button>
+          {!data.isPrincipalSold && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (data.onAddBranch) data.onAddBranch({
+                  description: data.vehicle_description,
+                  chapa: data.chapa,
+                  chasis: data.chasis,
+                  operation_id: data.operation_id
+                });
+              }}
+              title="Crear rama desde este vehículo"
+              style={{ 
+                background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                padding: 0, color: 'white', flexShrink: 0
+              }}
+            >
+              <PlusCircle size={12} />
+            </button>
+          )}
         </div>
         <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>
           CHAPA: {data.chapa || 'N/A'}
@@ -109,25 +111,27 @@ const VehicleNode = ({ data }) => {
             <a href="#" style={{ color: '#60a5fa', textDecoration: 'underline', display: 'block' }}>
               {t.description}
             </a>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                if (data.onAddBranch) data.onAddBranch({
-                  description: t.description,
-                  chapa: t.chapa,
-                  chasis: t.chasis,
-                  operation_id: data.operation_id
-                });
-              }}
-              title="Crear rama desde este vehículo"
-              style={{ 
-                background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                padding: 0, color: 'white', flexShrink: 0
-              }}
-            >
-              <PlusCircle size={12} />
-            </button>
+            {!t.isSold && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (data.onAddBranch) data.onAddBranch({
+                    description: t.description,
+                    chapa: t.chapa,
+                    chasis: t.chasis,
+                    operation_id: data.operation_id
+                  });
+                }}
+                title="Crear rama desde este vehículo"
+                style={{ 
+                  background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', 
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  padding: 0, color: 'white', flexShrink: 0
+                }}
+              >
+                <PlusCircle size={12} />
+              </button>
+            )}
           </div>
           <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>CHAPA: {t.chapa || 'N/A'}</div>
           <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>CHASIS: {t.chasis || 'N/A'}</div>
