@@ -12,10 +12,10 @@ import { PlusCircle } from 'lucide-react';
 // Custom Node for a 1:1 match with the user's detailed example
 const VehicleNode = ({ data }) => {
   const isVenta = data.operation_type === 'venta';
+  const isHighlighted = data.isHighlighted;
   
   return (
-    <div className={`glass card ${data.isHighlighted ? 'highlighted-node' : ''}`} style={{ 
-    <div className="card glass vehicle-node" style={{ 
+    <div className={`card glass vehicle-node ${isHighlighted ? 'highlighted-node' : ''}`} style={{ 
       padding: '24px', 
       width: '380px', 
       textAlign: 'left',
@@ -131,6 +131,12 @@ const nodeTypes = {
   vehicle: VehicleNode,
 };
 
+const defaultEdgeOptions = {
+  type: 'step',
+  animated: false,
+  style: { stroke: '#aa3bff', strokeWidth: 3 },
+};
+
 export function TreeView({ data, onAddBranch, highlightedId, isLoading }) {
   const { nodes, edges } = data || { nodes: [], edges: [] };
 
@@ -157,7 +163,9 @@ export function TreeView({ data, onAddBranch, highlightedId, isLoading }) {
           nodes={styledNodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          defaultEdgeOptions={defaultEdgeOptions}
           fitView
+          style={{ background: 'transparent' }}
         >
           <Background color="#111" gap={20} variant="dots" />
           <Controls />
