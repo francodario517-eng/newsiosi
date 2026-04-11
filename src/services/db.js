@@ -159,31 +159,14 @@ export const db = {
       const searchedV = op.vehicles.find(veh => veh.chasis === vehicleId || veh.chapa === vehicleId);
       const principalV = op.vehicles.find(veh => veh.role === 'principal');
       const displayV = searchedV || principalV;
-      const tradeIn = op.vehicles.find(veh => veh.role === 'parte_pago');
-
-      nodes.push({
-        id: nodeId,
-        type: 'vehicle',
-        data: {
-          operation_id: op.id,
-          operation_type: op.operation_type,
-          payment_type: op.payment_type,
-          date: new Date(op.date).toLocaleDateString('es-PY', { timeZone: 'UTC' }),
-          client_name: op.buyer,
-          vehicle_description: displayV?.description || 'Operación de Sistema',
-          chapa: displayV?.chapa || '',
-          chasis: displayV?.chasis || '',
-          currency: op.currency,
-          total_amount: op.total_amount,
-          delivery_amount: op.delivery_amount,
-          installments: op.installments,
-          credit_amount: op.credit_amount,
-          trade_in: tradeIn ? {
-            description: tradeIn.description,
-            amount: tradeIn.valuation,
-            chapa: tradeIn.chapa,
-            chasis: tradeIn.chasis
-          } : null
+          trade_ins: op.vehicles
+            .filter(veh => veh.role === 'parte_pago')
+            .map(t => ({
+              description: t.description,
+              amount: t.valuation,
+              chapa: t.chapa,
+              chasis: t.chasis
+            }))
         },
         position: { x: index * 450, y: 150 + (index % 2 === 0 ? 0 : 50) }
       });
