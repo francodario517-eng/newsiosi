@@ -1,7 +1,7 @@
 import React from 'react';
-import { Eye, Calendar, Trash2 } from 'lucide-react';
+import { Eye, Calendar, Trash2, Pencil } from 'lucide-react';
 
-export function OperationsTable({ operations, onSelectOperation, onDeleteOperation }) {
+export function OperationsTable({ operations, onSelectOperation, onDeleteOperation, onEditOperation }) {
   return (
     <div style={{ padding: '20px' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white' }}>
@@ -68,6 +68,20 @@ export function OperationsTable({ operations, onSelectOperation, onDeleteOperati
                     >
                       <Eye size={14} />
                       Ver Árbol
+                    </button>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ 
+                        padding: '6px', 
+                        fontSize: '12px', 
+                        color: 'var(--primary)', 
+                        borderColor: 'rgba(59, 130, 246, 0.2)',
+                        minWidth: '32px' 
+                      }}
+                      onClick={() => onEditOperation(op)}
+                      title="Editar Registro"
+                    >
+                      <Pencil size={14} />
                     </button>
                     <button 
                       className="btn btn-outline" 

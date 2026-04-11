@@ -86,6 +86,58 @@ export const db = {
     return { ...opData, parentId: opData.parent_id };
   },
 
+  updateOperation: async (id, op) => {
+    // 1. Update Operation
+    const { data: opData, error: opError } = await supabase
+      .from('operations')
+      .update({
+        operation_type: op.operation_type,
+        payment_type: op.payment_type,
+        date: op.date.split('/').reverse().join('-'),
+        currency: op.currency,
+        total_amount: op.total_amount,
+        buyer: op.buyer,
+        delivery_amount: op.delivery_amount || 0,
+        installments: op.installments || 0,
+        credit_amount: op.credit_amount || 0,
+        parent_id: op.parentId || null
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (opError) throw opError;
+
+    // 2. Update Vehicles (Delete old and insert new)
+    const { error: delError } = await supabase
+      .from('vehicles')
+      .delete()
+      .eq('operation_id', id);
+
+    if (delError) throw delError;
+
+    if (op.vehicles && op.vehicles.length > 0) {
+      const vehiclesToInsert = op.vehicles.map(v => ({
+        operation_id: id,
+        chapa: v.chapa,
+        chasis: v.chasis,
+        description: v.description,
+        color: v.color || '',
+        role: v.role,
+        valuation: v.valuation || 0
+      }));
+
+      const { error: vehError } = await supabase
+        .from('vehicles')
+        .insert(vehiclesToInsert);
+
+      if (vehError) throw vehError;
+    }
+
+    db.notify();
+    return { ...opData, parentId: opData.parent_id };
+  },
+
   getVehicleTraceability: async (vehicleId) => {
     const { data: ops, error } = await supabase.rpc('get_operation_genealogy', { 
       vehicle_id_search: vehicleId 

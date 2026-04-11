@@ -8,11 +8,12 @@ import {
   Plus, 
   Download,
   Settings,
+  Filter,
+  Trash2,
   X,
   TrendingUp,
   Package,
-  Calendar as CalendarIcon,
-  Filter
+  Calendar as CalendarIcon
 } from 'lucide-react'
 import './index.css'
 import { db } from './services/db'
@@ -37,6 +38,8 @@ function App() {
   const [highlightedId, setHighlightedId] = useState(null)
   const [isTreeLoading, setIsTreeLoading] = useState(false)
   const [session, setSession] = useState(null)
+  const [editingOperation, setEditingOperation] = useState(null)
+  const [tradeInVehicles, setTradeInVehicles] = useState([])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -88,30 +91,70 @@ function App() {
     setShowModal(true);
   }
 
-  const handleAddOperation = async (e) => {
+  const handleEditOperation = (op) => {
+    setEditingOperation(op);
+    const dateInput = op.date.split('/').reverse().join('-');
+    setPreFilledData({
+       id: op.id,
+       type: op.operation_type.charAt(0).toUpperCase() + op.operation_type.slice(1),
+       payment: op.payment_type.charAt(0).toUpperCase() + op.payment_type.slice(1),
+       date: dateInput,
+       buyer: op.buyer,
+       amount: op.total_amount,
+       delivery_amount: op.delivery_amount,
+       installments: op.installments,
+       credit_amount: op.credit_amount,
+       description: op.vehicles?.find(v => v.role === 'principal')?.description || '',
+       chapa: op.vehicles?.find(v => v.role === 'principal')?.chapa || '',
+       chasis: op.vehicles?.find(v => v.role === 'principal')?.chasis || '',
+    });
+    setTradeInVehicles(op.vehicles?.filter(v => v.role === 'parte_pago').map(v => ({
+      description: v.description,
+      chapa: v.chapa,
+      chasis: v.chasis,
+      valuation: v.valuation
+    })) || []);
+    setShowModal(true);
+  }
+
+  const handleAddTradeIn = () => {
+    setTradeInVehicles([...tradeInVehicles, { description: '', chapa: '', chasis: '', valuation: 0 }]);
+  }
+
+  const handleRemoveTradeIn = (index) => {
+    setTradeInVehicles(tradeInVehicles.filter((_, i) => i !== index));
+  }
+
+  const handleTradeInChange = (index, field, value) => {
+    const updated = [...tradeInVehicles];
+    updated[index][field] = value;
+    setTradeInVehicles(updated);
+  }
+
+  const handleSaveOperation = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    const tradeInDesc = formData.get('trade_in_description');
+    
     const vehiclesData = [{ 
-      id: Date.now(), 
       chapa: formData.get('chapa'),
       chasis: formData.get('chasis'),
       description: formData.get('description'), 
       role: 'principal' 
     }];
 
-    if (tradeInDesc) {
-      vehiclesData.push({
-        id: Date.now() + 1,
-        chapa: formData.get('trade_in_chapa'),
-        chasis: formData.get('trade_in_chasis'),
-        description: tradeInDesc,
-        role: 'parte_pago',
-        valuation: Number(formData.get('trade_in_valuation') || 0)
-      });
-    }
+    tradeInVehicles.forEach(v => {
+      if (v.description) {
+        vehiclesData.push({
+          chapa: v.chapa,
+          chasis: v.chasis,
+          description: v.description,
+          role: 'parte_pago',
+          valuation: Number(v.valuation || 0)
+        });
+      }
+    });
 
-    const newOp = {
+    const opData = {
       user_id: session.user.id,
       operation_type: formData.get('type').toLowerCase(),
       payment_type: formData.get('payment').toLowerCase(),
@@ -123,15 +166,22 @@ function App() {
       installments: Number(formData.get('installments') || 0),
       credit_amount: Number(formData.get('credit_amount') || 0),
       vehicles: vehiclesData,
-      parentId: preFilledData?.parentId
+      parentId: editingOperation?.parentId || preFilledData?.parentId
     };
-    await db.addOperation(newOp);
+
+    if (editingOperation) {
+      await db.updateOperation(editingOperation.id, opData);
+    } else {
+      await db.addOperation(opData);
+    }
+
     setShowModal(false);
+    setEditingOperation(null);
     setPreFilledData(null);
+    setTradeInVehicles([]);
     
-    // Refresh tree if currently viewing one
     if (selectedTraceability) {
-       handleSelectOperation(newOp);
+       handleSelectOperation(editingOperation || opData);
     }
   }
 
@@ -331,7 +381,7 @@ function App() {
               </div>
             )}
             <button className="btn btn-outline" onClick={exportToExcel} style={{ height: '44px' }}><Download size={18} /></button>
-            <button className="btn btn-primary" onClick={() => { setPreFilledData(null); setShowModal(true); }} style={{ height: '44px' }}><Plus size={18} /> Nuevo</button>
+            <button className="btn btn-primary" onClick={() => { setPreFilledData(null); setEditingOperation(null); setTradeInVehicles([]); setShowModal(true); }} style={{ height: '44px' }}><Plus size={18} /> Nuevo</button>
           </div>
         </header>
 
@@ -411,6 +461,7 @@ function App() {
                 operations={filteredOperations} 
                 onSelectOperation={handleSelectOperation} 
                 onDeleteOperation={handleDeleteOperation}
+                onEditOperation={handleEditOperation}
               />
             </div>
           )}
@@ -437,18 +488,18 @@ function App() {
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
           <div className="glass card animate-in" style={{ width: '600px', padding: '32px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
-              <h2 style={{ color: 'white' }}>{preFilledData ? 'Nueva Rama Comercial' : 'Nueva Operación'}</h2>
+              <h2 style={{ color: 'white' }}>{editingOperation ? 'Editar Registro' : preFilledData ? 'Nueva Rama Comercial' : 'Nueva Operación'}</h2>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'white' }}><X size={24} /></button>
             </div>
 
-            <form onSubmit={handleAddOperation}>
+            <form onSubmit={handleSaveOperation}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div><label>Tipo</label><select name="type"><option>Venta</option><option>Compra</option></select></div>
-                <div><label>Pago</label><select name="payment"><option>Crédito</option><option>Contado</option></select></div>
+                <div><label>Tipo</label><select name="type" defaultValue={preFilledData?.type || 'Venta'}><option>Venta</option><option>Compra</option></select></div>
+                <div><label>Pago</label><select name="payment" defaultValue={preFilledData?.payment || 'Contado'}><option>Crédito</option><option>Contado</option></select></div>
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div><label>Fecha</label><input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} /></div>
+                <div><label>Fecha</label><input name="date" type="date" defaultValue={preFilledData?.date || new Date().toISOString().split('T')[0]} /></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div><label>Chapa</label><input name="chapa" defaultValue={preFilledData?.chapa || ''} /></div>
                   <div><label>Chasis</label><input name="chasis" defaultValue={preFilledData?.chasis || ''} /></div>
@@ -459,42 +510,64 @@ function App() {
               <input name="description" defaultValue={preFilledData?.description || ''} />
               
               <label>Comprador / Vendedor</label>
-              <input name="buyer" placeholder="Nombre completo" />
+              <input name="buyer" defaultValue={preFilledData?.buyer || ''} placeholder="Nombre completo" />
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '16px' }}>
-                 <div><label>Entrega Contado</label><input name="delivery_amount" type="number" placeholder="0" /></div>
-                 <div><label>Cuotas</label><input name="installments" type="number" placeholder="0" /></div>
-                 <div><label>Monto Crédito</label><input name="credit_amount" type="number" placeholder="0" /></div>
+                 <div><label>Entrega Contado</label><input name="delivery_amount" type="number" defaultValue={preFilledData?.delivery_amount || 0} placeholder="0" /></div>
+                 <div><label>Cuotas</label><input name="installments" type="number" defaultValue={preFilledData?.installments || 0} placeholder="0" /></div>
+                 <div><label>Monto Crédito</label><input name="credit_amount" type="number" defaultValue={preFilledData?.credit_amount || 0} placeholder="0" /></div>
               </div>
 
               <label style={{ marginTop: '16px' }}>Monto Total (Total Operación)</label>
-              <input name="amount" type="number" placeholder="0.00" />
+              <input name="amount" type="number" defaultValue={preFilledData?.amount || 0} placeholder="0.00" />
               
               <div style={{ marginTop: '24px', padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed var(--border)' }}>
-                <h4 style={{ color: 'white', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Package size={18} color="var(--primary)" />
-                  Vehículo en Parte de Pago (Opcional)
-                </h4>
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ fontSize: '11px' }}>Descripción</label>
-                  <input name="trade_in_description" placeholder="Ej: KIA PICANTO 2020" />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h4 style={{ color: 'white', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                    <Package size={18} color="var(--primary)" />
+                    Vehículos en Parte de Pago
+                  </h4>
+                  <button type="button" className="btn btn-outline" onClick={handleAddTradeIn} style={{ padding: '4px 12px', fontSize: '11px' }}>
+                    <Plus size={14} /> Agregar
+                  </button>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                  <div>
-                    <label style={{ fontSize: '11px' }}>Chapa</label>
-                    <input name="trade_in_chapa" placeholder="Chapa" />
+
+                {tradeInVehicles.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '12px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    No hay vehículos adicionales cargados.
                   </div>
-                  <div>
-                    <label style={{ fontSize: '11px' }}>Chasis</label>
-                    <input name="trade_in_chasis" placeholder="Chasis" />
+                )}
+
+                {tradeInVehicles.map((v, index) => (
+                  <div key={index} style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '8px', marginBottom: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--primary)' }}>Vehículo #{index + 1}</span>
+                      <button type="button" onClick={() => handleRemoveTradeIn(index)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <label style={{ fontSize: '11px' }}>Descripción</label>
+                      <input value={v.description} onChange={(e) => handleTradeInChange(index, 'description', e.target.value)} placeholder="Ej: KIA PICANTO 2020" />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '8px' }}>
+                      <div>
+                        <label style={{ fontSize: '11px' }}>Chapa</label>
+                        <input value={v.chapa} onChange={(e) => handleTradeInChange(index, 'chapa', e.target.value)} placeholder="Chapa" />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px' }}>Chasis</label>
+                        <input value={v.chasis} onChange={(e) => handleTradeInChange(index, 'chasis', e.target.value)} placeholder="Chasis" />
+                      </div>
+                    </div>
+                    <label style={{ fontSize: '11px' }}>Valuación</label>
+                    <input type="number" value={v.valuation} onChange={(e) => handleTradeInChange(index, 'valuation', e.target.value)} placeholder="0.00" />
                   </div>
-                </div>
-                <label style={{ fontSize: '11px' }}>Valuación del Vehículo</label>
-                <input name="trade_in_valuation" type="number" placeholder="0.00" />
+                ))}
               </div>
 
               <div style={{ marginTop: '32px' }}>
-                <button type="submit" className="btn btn-primary" style={{ width: '100%', height: '50px' }}>Finalizar y Vincular</button>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', height: '50px' }}>
+                  {editingOperation ? 'Guardar Cambios' : 'Finalizar y Vincular'}
+                </button>
               </div>
             </form>
           </div>
