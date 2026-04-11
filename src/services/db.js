@@ -153,12 +153,44 @@ export const db = {
     const nodes = [];
     const edges = [];
     
-    // Sort by date ascending to ensure growth to the right (Oldest -> Newest)
-    const sortedOps = [...ops].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    sortedOps.forEach((op, index) => {
+    // Build map for hierarchy calculation
+    const opMap = new Map();
+    ops.forEach(op => {
+      opMap.set(op.id, { ...op, children: [], depth: 0 });
+    });
+
+    // Link parents to children
+    ops.forEach(op => {
+      if (op.parent_id && opMap.has(op.parent_id)) {
+        opMap.get(op.parent_id).children.push(op.id);
+      }
+    });
+
+    // Find roots (ancestors)
+    const roots = ops.filter(op => !op.parent_id || !opMap.has(op.parent_id));
+
+    // Calc depth per node
+    const visited = new Set();
+    const setDepth = (id, depth) => {
+      if (visited.has(id)) return;
+      visited.add(id);
+      const entry = opMap.get(id);
+      entry.depth = Math.max(entry.depth, depth);
+      entry.children.forEach(childId => setDepth(childId, depth + 1));
+    };
+
+    roots.forEach(r => setDepth(r.id, 0));
+
+    // Final sort and position assignment
+    const sortedOps = Array.from(opMap.values()).sort((a, b) => a.depth - b.depth);
+    const depthCounts = {};
+
+    sortedOps.forEach((op) => {
+      const depth = op.depth;
+      const vIdx = depthCounts[depth] || 0;
+      depthCounts[depth] = vIdx + 1;
+
       const nodeId = `node-${op.id}`;
-      // Find the vehicle relevant to the search or the principal one
       const searchedV = op.vehicles.find(veh => veh.chasis === vehicleId || veh.chapa === vehicleId);
       const principalV = op.vehicles.find(veh => veh.role === 'principal');
       const displayV = searchedV || principalV;
@@ -189,7 +221,7 @@ export const db = {
               chasis: t.chasis
             }))
         },
-        position: { x: index * 600, y: (index % 2) * 200 + 50 }
+        position: { x: depth * 750, y: vIdx * 500 + 50 }
       });
 
       if (op.parent_id) {
