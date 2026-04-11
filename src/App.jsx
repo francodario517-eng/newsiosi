@@ -48,6 +48,7 @@ function App() {
     operations.forEach(op => {
       const isVenta = op.operation_type.toLowerCase() === 'venta';
       const isCompra = op.operation_type.toLowerCase() === 'compra';
+      const isRescision = op.operation_type.toLowerCase() === 'rescisión';
 
       // 1. Record Exits (Principal vehicle of a Venta OR Trade-in of a Compra)
       op.vehicles.forEach(v => {
@@ -62,7 +63,7 @@ function App() {
 
       // 2. Record Entries (Principal of a Compra OR Trade-in of a Venta)
       op.vehicles.forEach(v => {
-        const isPrincipalEntry = isCompra && v.role === 'principal';
+        const isPrincipalEntry = (isCompra || isRescision) && v.role === 'principal';
         const isTradeInEntry = isVenta && v.role === 'parte_pago';
         
         if (isPrincipalEntry || isTradeInEntry) {
@@ -72,7 +73,7 @@ function App() {
             chasis: v.chasis,
             valuation: v.role === 'principal' ? op.total_amount : (v.valuation || 0),
             entry_date: op.date,
-            source_type: isPrincipalEntry ? 'COMPRA' : 'PARTE PAGO RECIBIDO',
+            source_type: isPrincipalEntry ? (isRescision ? 'RESCISIÓN' : 'COMPRA') : 'PARTE PAGO RECIBIDO',
             operation_id: op.id
           });
         }
@@ -628,7 +629,7 @@ function App() {
 
             <form onSubmit={handleSaveOperation}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div><label>Tipo</label><select name="type" required defaultValue={preFilledData?.type || 'Venta'}><option value="">Seleccionar...</option><option value="Venta">Venta</option><option value="Compra">Compra</option></select></div>
+                <div><label>Tipo</label><select name="type" required defaultValue={preFilledData?.type || 'Venta'}><option value="">Seleccionar...</option><option value="Venta">Venta</option><option value="Compra">Compra</option><option value="Rescisión">Rescisión</option></select></div>
                 <div><label>Pago</label><select name="payment" required defaultValue={preFilledData?.payment || 'Contado'}><option value="">Seleccionar...</option><option value="Crédito">Crédito</option><option value="Contado">Contado</option></select></div>
               </div>
               

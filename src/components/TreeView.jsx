@@ -12,6 +12,7 @@ import { PlusCircle, Edit2, Trash2 } from 'lucide-react';
 // Custom Node for a 1:1 match with the user's detailed example
 const VehicleNode = ({ data }) => {
   const isVenta = data.operation_type === 'venta';
+  const isCompraOrRescision = data.operation_type === 'compra' || data.operation_type === 'rescisión';
   const isHighlighted = data.isHighlighted;
   const hasTradeIn = data.trade_ins && data.trade_ins.length > 0;
   
@@ -27,6 +28,9 @@ const VehicleNode = ({ data }) => {
       statusColor = '#ef4444'; // Red for sales without trade-ins
       auraColor = 'rgba(239, 68, 68, 0.3)';
     }
+  } else if (isCompraOrRescision) {
+    statusColor = '#10b981'; // Green for entries (Purchases/Rescissions)
+    auraColor = 'rgba(16, 185, 129, 0.3)';
   } else if (isHighlighted) {
     statusColor = 'var(--primary)';
     auraColor = 'rgba(170, 59, 255, 0.3)';
