@@ -46,6 +46,7 @@ export const db = {
     const { data: opData, error: opError } = await supabase
       .from('operations')
       .insert([{
+        user_id: op.user_id,
         operation_type: op.operation_type,
         payment_type: op.payment_type,
         date: op.date.split('/').reverse().join('-'),

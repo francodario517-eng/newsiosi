@@ -20,6 +20,8 @@ import { financials } from './services/financials'
 import { OperationsTable } from './components/OperationsTable'
 import { TreeView } from './components/TreeView'
 import { StatsDashboard } from './components/StatsDashboard'
+import { Auth } from './components/Auth'
+import { supabase } from './services/db'
 import * as XLSX from 'xlsx'
 
 function App() {
@@ -34,6 +36,19 @@ function App() {
   const [preFilledData, setPreFilledData] = useState(null)
   const [highlightedId, setHighlightedId] = useState(null)
   const [isTreeLoading, setIsTreeLoading] = useState(false)
+  const [session, setSession] = useState(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const loadOps = async () => {
@@ -97,6 +112,7 @@ function App() {
     }
 
     const newOp = {
+      user_id: session.user.id,
       operation_type: formData.get('type').toLowerCase(),
       payment_type: formData.get('payment').toLowerCase(),
       date: new Date(formData.get('date')).toLocaleDateString('es-PY'), 
@@ -232,6 +248,10 @@ function App() {
     return (matchesBuyer || matchesVehicles || matchesGeneral) && isDateInRange(o.date);
   });
 
+  if (!session) {
+    return <Auth onSession={setSession} />;
+  }
+
   return (
     <div className="app-container">
       {/* Sidebar - Same as before */}
@@ -246,8 +266,13 @@ function App() {
           <button className={`btn ${activeTab === 'stats' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('stats')} style={{ width: '100%', justifyContent: 'flex-start' }}><BarChart3 size={20} /> Estadísticas</button>
         </nav>
         <div className="sidebar-footer">
-          <div className="card glass" style={{ padding: '12px', fontSize: '12px', marginBottom: '16px' }}><div style={{ color: 'var(--text-muted)' }}>Status</div><div style={{ color: '#10b981', fontWeight: 'bold' }}>● Sistema Online</div></div>
-          <button className="btn btn-outline" style={{ width: '100%', justifyContent: 'flex-start' }}><Settings size={20} /> Configuración</button>
+          <div className="card glass" style={{ padding: '12px', fontSize: '12px', marginBottom: '16px' }}>
+            <div style={{ color: 'var(--text-muted)' }}>Usuario</div>
+            <div style={{ color: 'var(--primary)', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis' }}>{session?.user?.email}</div>
+          </div>
+          <button className="btn btn-outline" style={{ width: '100%', justifyContent: 'flex-start' }} onClick={() => supabase.auth.signOut()}>
+            <X size={20} /> Salir del Sistema
+          </button>
         </div>
       </aside>
 
