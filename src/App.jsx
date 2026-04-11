@@ -1,4 +1,47 @@
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ 
+          height: '100vh', display: 'flex', flexDirection: 'column', 
+          alignItems: 'center', justifyContent: 'center', background: '#0a0b10', color: 'white',
+          textAlign: 'center', padding: '20px'
+        }}>
+          <h2 style={{ marginBottom: '16px' }}>MANTENIMIENTO / ERROR DE CARGA</h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>
+            Hubo un error al procesar los datos. Esto puede deberse a la caché del navegador.
+          </p>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => {
+              localStorage.clear();
+              window.location.reload();
+            }}
+          >
+            LIMPIAR CACHÉ Y REINTENTAR
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 import { 
   Car, 
   ArrowLeftRight, 
@@ -440,7 +483,8 @@ function App() {
   }
 
   return (
-    <div className="app-container">
+    <ErrorBoundary>
+      <div className="app-container">
       {/* Sidebar - Same as before */}
       <aside className="sidebar">
         <div className="logo-section">
@@ -724,7 +768,8 @@ function App() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   )
 }
 
