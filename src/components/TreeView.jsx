@@ -7,7 +7,7 @@ import ReactFlow, {
   Position
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2 } from 'lucide-react';
 
 // Custom Node for a 1:1 match with the user's detailed example
 const VehicleNode = ({ data }) => {
@@ -33,21 +33,58 @@ const VehicleNode = ({ data }) => {
   }
 
   return (
-    <div className={`card glass vehicle-node ${isHighlighted ? 'highlighted-node' : ''}`} style={{ 
-      padding: '24px', 
-      width: '380px', 
-      textAlign: 'left',
-      fontSize: '13px',
-      fontFamily: "'Courier New', Courier, monospace",
-      lineHeight: '1.4',
-      border: '2px solid',
-      borderColor: statusColor,
-      background: 'rgba(26, 27, 35, 0.95)',
-      color: '#d1d5db',
-      boxShadow: `0 0 20px ${auraColor}`,
-      position: 'relative',
-      transition: 'all 0.3s ease'
-    }}>
+    <div className={`card glass vehicle-node ${isHighlighted ? 'highlighted-node' : ''}`}
+      style={{ 
+        padding: '24px', 
+        width: '380px', 
+        textAlign: 'left',
+        fontSize: '13px',
+        fontFamily: "'Courier New', Courier, monospace",
+        lineHeight: '1.4',
+        border: '2px solid',
+        borderColor: statusColor,
+        background: 'rgba(26, 27, 35, 0.95)',
+        color: '#d1d5db',
+        boxShadow: `0 0 20px ${auraColor}`,
+        position: 'relative',
+        transition: 'all 0.3s ease'
+      }}
+    >
+      {/* Action Buttons (Top Right) */}
+      <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            if (data.onEditOperation) data.onEditOperation(data.raw_data);
+          }}
+          title="Editar operación"
+          style={{ 
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', 
+            borderRadius: '4px', width: '28px', height: '28px', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            padding: 0, color: 'var(--text-muted)'
+          }}
+          className="node-action-btn"
+        >
+          <Edit2 size={14} />
+        </button>
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            if (data.onDeleteOperation) data.onDeleteOperation(data.raw_data);
+          }}
+          title="Eliminar operación"
+          style={{ 
+            background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', 
+            borderRadius: '4px', width: '28px', height: '28px', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            padding: 0, color: '#ef4444'
+          }}
+          className="node-action-btn"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
       {/* Input Handle (Left) */}
       <Handle type="target" position={Position.Left} style={{ background: 'var(--primary)', border: 'none', width: '10px', height: '10px' }} />
       
@@ -158,7 +195,7 @@ const nodeTypes = {
 
 
 
-export function TreeView({ data, onAddBranch, highlightedId, isLoading }) {
+export function TreeView({ data, onAddBranch, onEditOperation, onDeleteOperation, highlightedId, isLoading }) {
   const { nodes, edges } = data || { nodes: [], edges: [] };
 
   const styledNodes = useMemo(() => nodes.map(node => ({
@@ -167,9 +204,11 @@ export function TreeView({ data, onAddBranch, highlightedId, isLoading }) {
     data: { 
       ...node.data,
       onAddBranch,
+      onEditOperation,
+      onDeleteOperation,
       isHighlighted: node.data.operation_id === highlightedId
     }
-  })), [nodes, onAddBranch, highlightedId]);
+  })), [nodes, onAddBranch, onEditOperation, onDeleteOperation, highlightedId]);
 
   return (
     <div style={{ width: '100%', height: '800px', background: '#0a0b10', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>

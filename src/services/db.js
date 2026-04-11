@@ -238,7 +238,13 @@ export const db = {
               chasis: t.chasis,
               isExit: op.operation_type === 'compra',
               isSold: (t.chasis || t.chapa) ? soldInChain.has(`${op.id}-${(t.chasis || t.chapa || '').trim().toUpperCase()}`) : false
-            }))
+            })),
+          raw_data: {
+            ...op,
+            date: new Date(op.date).toLocaleDateString('es-PY', { timeZone: 'UTC' }),
+            parentId: op.parent_id,
+            vehicles: op.vehicles || []
+          }
         },
         position: { x: depth * 750, y: vIdx * 500 + 50 }
       });

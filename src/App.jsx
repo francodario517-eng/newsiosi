@@ -574,6 +574,8 @@ function App() {
                <TreeView 
                  data={selectedTraceability} 
                  onAddBranch={handleOpenBranchModal} 
+                 onEditOperation={handleEditOperation}
+                 onDeleteOperation={handleDeleteOperation}
                  highlightedId={highlightedId}
                  isLoading={isTreeLoading}
                />
