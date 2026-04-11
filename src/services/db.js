@@ -236,6 +236,7 @@ export const db = {
               amount: t.valuation,
               chapa: t.chapa,
               chasis: t.chasis,
+              isExit: op.operation_type === 'compra',
               isSold: (t.chasis || t.chapa) ? soldInChain.has(`${op.id}-${(t.chasis || t.chapa || '').trim().toUpperCase()}`) : false
             }))
         },

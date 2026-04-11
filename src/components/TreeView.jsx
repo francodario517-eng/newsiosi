@@ -111,7 +111,7 @@ const VehicleNode = ({ data }) => {
             <a href="#" style={{ color: '#60a5fa', textDecoration: 'underline', display: 'block' }}>
               {t.description}
             </a>
-            {!t.isSold && (
+            {(!t.isExit && !t.isSold) && (
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -131,6 +131,9 @@ const VehicleNode = ({ data }) => {
               >
                 <PlusCircle size={12} />
               </button>
+            )}
+            {t.isExit && (
+              <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 'bold', marginLeft: 'auto' }}>[SALIDA STOCK]</span>
             )}
           </div>
           <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>CHAPA: {t.chapa || 'N/A'}</div>

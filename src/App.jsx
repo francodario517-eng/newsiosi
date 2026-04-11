@@ -43,44 +43,47 @@ function App() {
 
   const stockVehicles = useMemo(() => {
     const entries = [];
-    const sales = new Set();
+    const exits = new Set();
 
     operations.forEach(op => {
       const isVenta = op.operation_type.toLowerCase() === 'venta';
       const isCompra = op.operation_type.toLowerCase() === 'compra';
 
-      // Record sales (principal vehicle of a Venta)
-      if (isVenta) {
-        op.vehicles.forEach(v => {
-          if (v.role === 'principal') {
-            const id = (v.chasis || v.chapa || '').trim().toUpperCase();
-            if (id) sales.add(id);
-          }
-        });
-      }
-
-      // Record entries (Principal in Compra OR Trade-in in any)
+      // 1. Record Exits (Principal vehicle of a Venta OR Trade-in of a Compra)
       op.vehicles.forEach(v => {
-        const isEntry = (isCompra && v.role === 'principal') || v.role === 'parte_pago';
-        if (isEntry) {
+        const isPrincipalExit = isVenta && v.role === 'principal';
+        const isTradeInExit = isCompra && v.role === 'parte_pago';
+        
+        if (isPrincipalExit || isTradeInExit) {
+          const id = (v.chasis || v.chapa || '').trim().toUpperCase();
+          if (id) exits.add(id);
+        }
+      });
+
+      // 2. Record Entries (Principal of a Compra OR Trade-in of a Venta)
+      op.vehicles.forEach(v => {
+        const isPrincipalEntry = isCompra && v.role === 'principal';
+        const isTradeInEntry = isVenta && v.role === 'parte_pago';
+        
+        if (isPrincipalEntry || isTradeInEntry) {
           entries.push({
             description: v.description,
             chapa: v.chapa,
             chasis: v.chasis,
             valuation: v.role === 'principal' ? op.total_amount : (v.valuation || 0),
             entry_date: op.date,
-            source_type: isCompra && v.role === 'principal' ? 'COMPRA' : 'PARTE PAGO',
+            source_type: isPrincipalEntry ? 'COMPRA' : 'PARTE PAGO RECIBIDO',
             operation_id: op.id
           });
         }
       });
     });
 
-    // Filter out entries that have a corresponding sale
+    // 3. Filter out entries that have a corresponding exit
     return entries.filter(entry => {
       const entryId = (entry.chasis || entry.chapa || '').trim().toUpperCase();
-      if (!entryId) return true; // Keep if no ID to track
-      return !sales.has(entryId);
+      if (!entryId) return true;
+      return !exits.has(entryId);
     });
   }, [operations]);
   const [tradeInVehicles, setTradeInVehicles] = useState([])
@@ -523,6 +526,20 @@ function App() {
                   <div className="skeleton" style={{ height: '28px', width: '120px', marginTop: '4px' }}></div>
                 ) : (
                   <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.tradeInCount} unidades</div>
+                )}
+              </div>
+            </div>
+
+            <div className="card glass" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '12px', borderRadius: '12px' }}>
+                <Package color="#3b82f6" size={24} />
+              </div>
+              <div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Total en Stock</div>
+                {isTreeLoading ? (
+                  <div className="skeleton" style={{ height: '28px', width: '120px', marginTop: '4px' }}></div>
+                ) : (
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3b82f6' }}>{stockVehicles.length} unidades</div>
                 )}
               </div>
             </div>
