@@ -153,8 +153,8 @@ export const db = {
     const nodes = [];
     const edges = [];
     
-    // Reverse to get oldest-first (Left to Right flow)
-    const sortedOps = [...ops].reverse();
+    // Sort by date ascending to ensure growth to the right (Oldest -> Newest)
+    const sortedOps = [...ops].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     sortedOps.forEach((op, index) => {
       const nodeId = `node-${op.id}`;
