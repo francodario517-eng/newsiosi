@@ -13,7 +13,25 @@ import { PlusCircle } from 'lucide-react';
 const VehicleNode = ({ data }) => {
   const isVenta = data.operation_type === 'venta';
   const isHighlighted = data.isHighlighted;
+  const hasTradeIn = data.trade_ins && data.trade_ins.length > 0;
   
+  // Dynamic color logic based on user request
+  let statusColor = 'rgba(255,255,255,0.05)'; // Default
+  let auraColor = 'transparent';
+  
+  if (isVenta) {
+    if (hasTradeIn) {
+      statusColor = '#10b981'; // Green for sales with trade-ins
+      auraColor = 'rgba(16, 185, 129, 0.3)';
+    } else {
+      statusColor = '#ef4444'; // Red for sales without trade-ins
+      auraColor = 'rgba(239, 68, 68, 0.3)';
+    }
+  } else if (isHighlighted) {
+    statusColor = 'var(--primary)';
+    auraColor = 'rgba(170, 59, 255, 0.3)';
+  }
+
   return (
     <div className={`card glass vehicle-node ${isHighlighted ? 'highlighted-node' : ''}`} style={{ 
       padding: '24px', 
@@ -23,10 +41,10 @@ const VehicleNode = ({ data }) => {
       fontFamily: "'Courier New', Courier, monospace",
       lineHeight: '1.4',
       border: '2px solid',
-      borderColor: isHighlighted ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+      borderColor: statusColor,
       background: 'rgba(26, 27, 35, 0.95)',
       color: '#d1d5db',
-      boxShadow: isHighlighted ? '0 0 20px rgba(170, 59, 255, 0.3)' : 'var(--shadow-lg)',
+      boxShadow: `0 0 20px ${auraColor}`,
       position: 'relative',
       transition: 'all 0.3s ease'
     }}>
