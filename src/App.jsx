@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   Car, 
   ArrowLeftRight, 
@@ -24,6 +24,7 @@ import { StatsDashboard } from './components/StatsDashboard'
 import { Auth } from './components/Auth'
 import { supabase } from './services/db'
 import * as XLSX from 'xlsx'
+import { StockTable } from './components/StockTable'
 
 function App() {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'operations')
@@ -39,6 +40,49 @@ function App() {
   const [isTreeLoading, setIsTreeLoading] = useState(false)
   const [session, setSession] = useState(null)
   const [editingOperation, setEditingOperation] = useState(null)
+
+  const stockVehicles = useMemo(() => {
+    const entries = [];
+    const sales = new Set();
+
+    operations.forEach(op => {
+      const isVenta = op.operation_type.toLowerCase() === 'venta';
+      const isCompra = op.operation_type.toLowerCase() === 'compra';
+
+      // Record sales (principal vehicle of a Venta)
+      if (isVenta) {
+        op.vehicles.forEach(v => {
+          if (v.role === 'principal') {
+            const id = (v.chasis || v.chapa || '').trim().toUpperCase();
+            if (id) sales.add(id);
+          }
+        });
+      }
+
+      // Record entries (Principal in Compra OR Trade-in in any)
+      op.vehicles.forEach(v => {
+        const isEntry = (isCompra && v.role === 'principal') || v.role === 'parte_pago';
+        if (isEntry) {
+          entries.push({
+            description: v.description,
+            chapa: v.chapa,
+            chasis: v.chasis,
+            valuation: v.role === 'principal' ? op.total_amount : (v.valuation || 0),
+            entry_date: op.date,
+            source_type: isCompra && v.role === 'principal' ? 'COMPRA' : 'PARTE PAGO',
+            operation_id: op.id
+          });
+        }
+      });
+    });
+
+    // Filter out entries that have a corresponding sale
+    return entries.filter(entry => {
+      const entryId = (entry.chasis || entry.chapa || '').trim().toUpperCase();
+      if (!entryId) return true; // Keep if no ID to track
+      return !sales.has(entryId);
+    });
+  }, [operations]);
   const [tradeInVehicles, setTradeInVehicles] = useState([])
 
   useEffect(() => {
@@ -353,6 +397,7 @@ function App() {
         </div>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <button className={`btn ${activeTab === 'operations' ? 'btn-primary' : 'btn-outline'}`} onClick={() => { setActiveTab('operations'); setSelectedTraceability(null); }} style={{ width: '100%', justifyContent: 'flex-start' }}><ArrowLeftRight size={20} /> Operaciones</button>
+          <button className={`btn ${activeTab === 'stock' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('stock')} style={{ width: '100%', justifyContent: 'flex-start' }}><Package size={20} /> Stock</button>
           <button className={`btn ${activeTab === 'tree' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('tree')} style={{ width: '100%', justifyContent: 'flex-start' }}><GitBranch size={20} /> Trazabilidad</button>
           <button className={`btn ${activeTab === 'stats' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('stats')} style={{ width: '100%', justifyContent: 'flex-start' }}><BarChart3 size={20} /> Estadísticas</button>
         </nav>
@@ -371,8 +416,8 @@ function App() {
       <main className="main-content">
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '48px' }}>
           <div className="animate-in">
-            <h1>{activeTab === 'operations' ? 'Operaciones' : activeTab === 'tree' ? 'Trazabilidad' : 'Analítica'}</h1>
-            <h2 style={{ color: 'var(--text-muted)' }}>{activeTab === 'operations' ? 'Gestión de transacciones' : activeTab === 'tree' ? 'Cadena de valor comercial' : 'KPIs Financieros Globales'}</h2>
+            <h1>{activeTab === 'operations' ? 'Operaciones' : activeTab === 'stock' ? 'Inventario' : activeTab === 'tree' ? 'Trazabilidad' : 'Analítica'}</h1>
+            <h2 style={{ color: 'var(--text-muted)' }}>{activeTab === 'operations' ? 'Gestión de transacciones' : activeTab === 'stock' ? 'Vehículos disponibles para venta' : activeTab === 'tree' ? 'Cadena de valor comercial' : 'KPIs Financieros Globales'}</h2>
           </div>
 
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -492,6 +537,14 @@ function App() {
                 onSelectOperation={handleSelectOperation} 
                 onDeleteOperation={handleDeleteOperation}
                 onEditOperation={handleEditOperation}
+              />
+            </div>
+          )}
+          {activeTab === 'stock' && (
+            <div className="card glass">
+              <StockTable 
+                stock={stockVehicles} 
+                onSellVehicle={handleOpenBranchModal} 
               />
             </div>
           )}
