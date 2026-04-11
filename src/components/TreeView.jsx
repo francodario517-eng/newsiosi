@@ -15,20 +15,23 @@ const VehicleNode = ({ data }) => {
   
   return (
     <div className={`glass card ${data.isHighlighted ? 'highlighted-node' : ''}`} style={{ 
+    <div className="card glass vehicle-node" style={{ 
       padding: '24px', 
       width: '380px', 
       textAlign: 'left',
       fontSize: '13px',
       fontFamily: "'Courier New', Courier, monospace",
       lineHeight: '1.4',
-      border: data.isHighlighted ? '2px solid var(--primary)' : '1px solid var(--border)',
-      background: '#1a1b23',
+      border: '2px solid',
+      borderColor: isHighlighted ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+      background: 'rgba(26, 27, 35, 0.95)',
       color: '#d1d5db',
-      boxShadow: data.isHighlighted ? '0 0 30px rgba(170, 59, 255, 0.4)' : 'var(--shadow-lg)',
+      boxShadow: isHighlighted ? '0 0 20px rgba(170, 59, 255, 0.3)' : 'var(--shadow-lg)',
       position: 'relative',
       transition: 'all 0.3s ease'
     }}>
-      <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
+      {/* Input Handle (Left) */}
+      <Handle type="target" position={Position.Left} style={{ background: 'var(--primary)', border: 'none', width: '10px', height: '10px' }} />
       
       <div style={{ marginBottom: '16px' }}>
         <div>Tipo de Operacion {data.operation_type?.toUpperCase()}</div>
@@ -118,10 +121,8 @@ const VehicleNode = ({ data }) => {
         Monto Total {data.currency} {data.total_amount?.toLocaleString()}
       </div>
 
-      {/* Action Handle */}
-      <div style={{ position: 'absolute', right: '-12px', top: '50%', transform: 'translateY(-50%)', zIndex: 10 }}>
-        <Handle type="source" position={Position.Right} style={{ background: 'var(--primary)', border: 'none', width: '12px', height: '12px' }} />
-      </div>
+      {/* Output Handle (Right) */}
+      <Handle type="source" position={Position.Right} style={{ background: 'var(--primary)', border: 'none', width: '10px', height: '10px' }} />
     </div>
   );
 };

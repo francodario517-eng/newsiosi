@@ -153,8 +153,10 @@ export const db = {
     const nodes = [];
     const edges = [];
     
-    // Use logical order: ancestors first, results in flow to the right
-    ops.forEach((op, index) => {
+    // Reverse to get oldest-first (Left to Right flow)
+    const sortedOps = [...ops].reverse();
+    
+    sortedOps.forEach((op, index) => {
       const nodeId = `node-${op.id}`;
       // Find the vehicle relevant to the search or the principal one
       const searchedV = op.vehicles.find(veh => veh.chasis === vehicleId || veh.chapa === vehicleId);
@@ -187,7 +189,7 @@ export const db = {
               chasis: t.chasis
             }))
         },
-        position: { x: index * 500, y: 50 }
+        position: { x: index * 600, y: 50 }
       });
 
       if (op.parent_id) {
@@ -195,7 +197,9 @@ export const db = {
           id: `e-node-${op.parent_id}-${nodeId}`, 
           source: `node-${op.parent_id}`, 
           target: nodeId, 
-          animated: true 
+          animated: true,
+          type: 'smoothstep',
+          style: { stroke: 'var(--primary)', strokeWidth: 2 }
         });
       }
     });

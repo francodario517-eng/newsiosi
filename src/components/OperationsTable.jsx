@@ -54,7 +54,7 @@ export function OperationsTable({ operations, onSelectOperation, onDeleteOperati
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {op.vehicles.map(v => (
                       <span key={v.id} style={{ fontSize: '11px', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>
-                        {v.identifier}
+                        {v.chapa || v.chasis || v.description}
                       </span>
                     ))}
                   </div>
