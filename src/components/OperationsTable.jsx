@@ -1,7 +1,7 @@
 import React from 'react';
-import { Eye, Calendar } from 'lucide-react';
+import { Eye, Calendar, Trash2 } from 'lucide-react';
 
-export function OperationsTable({ operations, onSelectOperation }) {
+export function OperationsTable({ operations, onSelectOperation, onDeleteOperation }) {
   return (
     <div style={{ padding: '20px' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white' }}>
@@ -60,14 +60,30 @@ export function OperationsTable({ operations, onSelectOperation }) {
                   </div>
                 </td>
                 <td style={{ padding: '16px' }}>
-                  <button 
-                    className="btn btn-outline" 
-                    style={{ padding: '6px 12px', fontSize: '12px' }}
-                    onClick={() => onSelectOperation(op)}
-                  >
-                    <Eye size={14} />
-                    Ver Árbol
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ padding: '6px 12px', fontSize: '12px' }}
+                      onClick={() => onSelectOperation(op)}
+                    >
+                      <Eye size={14} />
+                      Ver Árbol
+                    </button>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ 
+                        padding: '6px', 
+                        fontSize: '12px', 
+                        color: '#ef4444', 
+                        borderColor: 'rgba(239, 68, 68, 0.2)',
+                        minWidth: '32px' 
+                      }}
+                      onClick={() => onDeleteOperation(op)}
+                      title="Eliminar Registro"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))

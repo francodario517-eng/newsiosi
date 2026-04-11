@@ -135,6 +135,17 @@ function App() {
     }
   }
 
+  const handleDeleteOperation = async (op) => {
+    if (window.confirm(`¿Estás seguro de eliminar esta operación del ${op.date}? Se borrarán también los vehículos asociados.`)) {
+      try {
+        await db.deleteOperation(op.id);
+        // Local refresh is handled via subscription in useEffect
+      } catch (err) {
+        alert('Error al eliminar: ' + err.message);
+      }
+    }
+  }
+
   const exportToExcel = async () => {
     // Determine which operations to export (only those currently filtered)
     const targetOps = filteredOperations;
@@ -394,7 +405,15 @@ function App() {
         )}
 
         <section className="animate-in">
-          {activeTab === 'operations' && <div className="card glass"><OperationsTable operations={filteredOperations} onSelectOperation={handleSelectOperation} /></div>}
+          {activeTab === 'operations' && (
+            <div className="card glass">
+              <OperationsTable 
+                operations={filteredOperations} 
+                onSelectOperation={handleSelectOperation} 
+                onDeleteOperation={handleDeleteOperation}
+              />
+            </div>
+          )}
           {activeTab === 'tree' && (
             <div className="card glass" style={{ padding: '0' }}>
                <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>

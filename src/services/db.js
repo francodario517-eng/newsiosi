@@ -147,5 +147,16 @@ export const db = {
     });
 
     return { nodes, edges };
+  },
+
+  deleteOperation: async (id) => {
+    const { error } = await supabase
+      .from('operations')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    db.notify();
+    return true;
   }
 };
