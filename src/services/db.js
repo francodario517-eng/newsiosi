@@ -153,12 +153,33 @@ export const db = {
     const nodes = [];
     const edges = [];
     
-    ops.forEach((op, index) => {
+    // Reverse to show from oldest (source) to newest (destination)
+    const reversedOps = [...ops].reverse();
+
+    reversedOps.forEach((op, index) => {
       const nodeId = `node-${op.id}`;
       // Find the vehicle relevant to the search or the principal one
       const searchedV = op.vehicles.find(veh => veh.chasis === vehicleId || veh.chapa === vehicleId);
       const principalV = op.vehicles.find(veh => veh.role === 'principal');
       const displayV = searchedV || principalV;
+
+      nodes.push({
+        id: nodeId,
+        type: 'vehicle',
+        data: {
+          operation_id: op.id,
+          operation_type: op.operation_type,
+          payment_type: op.payment_type,
+          date: new Date(op.date).toLocaleDateString('es-PY', { timeZone: 'UTC' }),
+          client_name: op.buyer,
+          vehicle_description: displayV?.description || 'Operación de Sistema',
+          chapa: displayV?.chapa || '',
+          chasis: displayV?.chasis || '',
+          currency: op.currency,
+          total_amount: op.total_amount,
+          delivery_amount: op.delivery_amount,
+          installments: op.installments,
+          credit_amount: op.credit_amount,
           trade_ins: op.vehicles
             .filter(veh => veh.role === 'parte_pago')
             .map(t => ({
