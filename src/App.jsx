@@ -33,6 +33,7 @@ function App() {
   const [operations, setOperations] = useState([])
   const [preFilledData, setPreFilledData] = useState(null)
   const [highlightedId, setHighlightedId] = useState(null)
+  const [isTreeLoading, setIsTreeLoading] = useState(false)
 
   useEffect(() => {
     const loadOps = async () => {
@@ -47,10 +48,18 @@ function App() {
     const vehicleId = op.vehicles[0]?.chasis || op.vehicles[0]?.chapa || op.vehicles[0]?.id || op.vehicles[0]?.identifier;
     if (vehicleId) {
       setHighlightedId(op.id);
-      const trace = await db.getVehicleTraceability(vehicleId);
-      setSelectedTraceability(trace);
-      setStats(financials.getTreeStats(trace));
       setActiveTab('tree');
+      setIsTreeLoading(true);
+      
+      try {
+        const trace = await db.getVehicleTraceability(vehicleId);
+        setSelectedTraceability(trace);
+        setStats(financials.getTreeStats(trace));
+      } catch (err) {
+        console.error("Error loading tree:", err);
+      } finally {
+        setIsTreeLoading(false);
+      }
     }
   }
 
@@ -313,7 +322,7 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'tree' && selectedTraceability && (
+        {activeTab === 'tree' && (selectedTraceability || isTreeLoading) && (
           <div className="animate-in" style={{ display: 'flex', gap: '24px', marginBottom: '32px' }}>
             <div className="card glass" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '20px' }}>
               <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '12px', borderRadius: '12px' }}>
@@ -321,7 +330,11 @@ function App() {
               </div>
               <div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Inversión Inicial (Costo)</div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3b82f6' }}>USD {stats.totalInvestment.toLocaleString()}</div>
+                {isTreeLoading ? (
+                  <div className="skeleton" style={{ height: '28px', width: '120px', marginTop: '4px' }}></div>
+                ) : (
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3b82f6' }}>USD {stats.totalInvestment.toLocaleString()}</div>
+                )}
               </div>
             </div>
 
@@ -331,7 +344,11 @@ function App() {
               </div>
               <div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Ganancia Estimada</div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: stats.totalProfit > 0 ? '#10b981' : '#ef4444' }}>USD {stats.totalProfit.toLocaleString()}</div>
+                {isTreeLoading ? (
+                  <div className="skeleton" style={{ height: '28px', width: '120px', marginTop: '4px' }}></div>
+                ) : (
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: stats.totalProfit > 0 ? '#10b981' : '#ef4444' }}>USD {stats.totalProfit.toLocaleString()}</div>
+                )}
               </div>
             </div>
             
@@ -341,7 +358,11 @@ function App() {
               </div>
               <div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Vehículos en el Árbol</div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.tradeInCount} unidades</div>
+                {isTreeLoading ? (
+                  <div className="skeleton" style={{ height: '28px', width: '120px', marginTop: '4px' }}></div>
+                ) : (
+                  <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.tradeInCount} unidades</div>
+                )}
               </div>
             </div>
           </div>
@@ -359,6 +380,7 @@ function App() {
                  data={selectedTraceability} 
                  onAddBranch={handleOpenBranchModal} 
                  highlightedId={highlightedId}
+                 isLoading={isTreeLoading}
                />
             </div>
           )}

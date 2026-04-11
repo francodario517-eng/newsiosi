@@ -86,61 +86,26 @@ export const db = {
   },
 
   getVehicleTraceability: async (vehicleId) => {
-    // 1. Find all operations where this vehicle is present
-    const { data: vehMatches } = await supabase
-      .from('vehicles')
-      .select('operation_id')
-      .or(`chapa.eq."${vehicleId}",chasis.eq."${vehicleId}"`);
-
-    if (!vehMatches || vehMatches.length === 0) return { nodes: [], edges: [] };
-
-    // 2. We need to find the ABSOLUTE ROOT of these operations to show the full history
-    const allOpsInChainSet = new Set();
-    
-    // Fetch all potentially involved operations to trace roots locally (more efficient than 20 queries)
-    const { data: allOps } = await supabase.from('operations').select('*');
-    
-    const findRootId = (opId) => {
-      const op = allOps.find(o => o.id === opId);
-      if (!op || !op.parent_id) return opId;
-      return findRootId(op.parent_id);
-    };
-
-    const rootIds = [...new Set(vehMatches.map(m => findRootId(m.operation_id)))];
-
-    // 3. Get all descendants of these roots to build the complete genealogy
-    const getDescendants = (parentId) => {
-      const children = allOps.filter(o => o.parent_id === parentId);
-      let results = [...children];
-      children.forEach(child => {
-          results = [...results, ...getDescendants(child.id)];
-      });
-      return results;
-    };
-
-    const fullGenealogyIds = new Set();
-    rootIds.forEach(rid => {
-      fullGenealogyIds.add(rid);
-      getDescendants(rid).forEach(d => fullGenealogyIds.add(d.id));
+    const { data: ops, error } = await supabase.rpc('get_operation_genealogy', { 
+      vehicle_id_search: vehicleId 
     });
 
-    // 4. Fetch full details for the entire genealogy
-    const { data: ops } = await supabase
-      .from('operations')
-      .select('*, vehicles(*)')
-      .in('id', Array.from(fullGenealogyIds))
-      .order('date', { ascending: true });
+    if (error) {
+      console.error('Error fetching genealogy:', error);
+      return { nodes: [], edges: [] };
+    }
+
+    if (!ops || ops.length === 0) return { nodes: [], edges: [] };
 
     const nodes = [];
     const edges = [];
     
     ops.forEach((op, index) => {
       const nodeId = `node-${op.id}`;
-      // For this node, show the vehicle they searched for OR the principal vehicle
+      // Find the vehicle relevant to the search or the principal one
       const searchedV = op.vehicles.find(veh => veh.chasis === vehicleId || veh.chapa === vehicleId);
       const principalV = op.vehicles.find(veh => veh.role === 'principal');
       const displayV = searchedV || principalV;
-      
       const tradeIn = op.vehicles.find(veh => veh.role === 'parte_pago');
 
       nodes.push({

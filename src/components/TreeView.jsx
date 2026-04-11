@@ -103,7 +103,7 @@ const nodeTypes = {
   vehicle: VehicleNode,
 };
 
-export function TreeView({ data, onAddBranch, highlightedId }) {
+export function TreeView({ data, onAddBranch, highlightedId, isLoading }) {
   const { nodes, edges } = data || { nodes: [], edges: [] };
 
   const styledNodes = useMemo(() => nodes.map(node => ({
@@ -117,20 +117,28 @@ export function TreeView({ data, onAddBranch, highlightedId }) {
   })), [nodes, onAddBranch, highlightedId]);
 
   return (
-    <div style={{ width: '100%', height: '800px', background: '#0a0b10', borderRadius: '12px', overflow: 'hidden' }}>
-      <ReactFlow
-        nodes={styledNodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        fitView
-      >
-        <Background color="#111" gap={20} variant="dots" />
-        <Controls />
-        <MiniMap 
-          nodeColor={(n) => n.data.operation_type === 'venta' ? '#ef4444' : '#10b981'}
-          maskColor="rgba(0,0,0,0.5)"
-        />
-      </ReactFlow>
+    <div style={{ width: '100%', height: '800px', background: '#0a0b10', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
+      {isLoading ? (
+        <div className="loader-container">
+          <div className="pulse-loader"></div>
+          <div style={{ fontSize: '18px', fontWeight: '500', letterSpacing: '0.05em' }}>PROCESANDO TRAZABILIDAD...</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Conectando con Supabase Engine</div>
+        </div>
+      ) : (
+        <ReactFlow
+          nodes={styledNodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          fitView
+        >
+          <Background color="#111" gap={20} variant="dots" />
+          <Controls />
+          <MiniMap 
+            nodeColor={(n) => n.data.operation_type === 'venta' ? '#ef4444' : '#10b981'}
+            maskColor="rgba(0,0,0,0.5)"
+          />
+        </ReactFlow>
+      )}
     </div>
   );
 }
