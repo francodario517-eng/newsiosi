@@ -617,12 +617,12 @@ function App() {
 
             <form onSubmit={handleSaveOperation}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div><label>Tipo</label><select name="type" defaultValue={preFilledData?.type || 'Venta'}><option>Venta</option><option>Compra</option></select></div>
-                <div><label>Pago</label><select name="payment" defaultValue={preFilledData?.payment || 'Contado'}><option>Crédito</option><option>Contado</option></select></div>
+                <div><label>Tipo</label><select name="type" required defaultValue={preFilledData?.type || 'Venta'}><option value="">Seleccionar...</option><option value="Venta">Venta</option><option value="Compra">Compra</option></select></div>
+                <div><label>Pago</label><select name="payment" required defaultValue={preFilledData?.payment || 'Contado'}><option value="">Seleccionar...</option><option value="Crédito">Crédito</option><option value="Contado">Contado</option></select></div>
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div><label>Fecha</label><input name="date" type="date" defaultValue={preFilledData?.date || new Date().toISOString().split('T')[0]} /></div>
+                <div><label>Fecha</label><input name="date" type="date" required defaultValue={preFilledData?.date || new Date().toISOString().split('T')[0]} /></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div><label>Chapa</label><input name="chapa" defaultValue={preFilledData?.chapa || ''} /></div>
                   <div><label>Chasis</label><input name="chasis" defaultValue={preFilledData?.chasis || ''} /></div>
@@ -636,13 +636,13 @@ function App() {
               <input name="buyer" defaultValue={preFilledData?.buyer || ''} placeholder="Nombre completo" />
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '16px' }}>
-                 <div><label>Entrega Contado</label><input name="delivery_amount" type="number" defaultValue={preFilledData?.delivery_amount || 0} placeholder="0" /></div>
-                 <div><label>Cuotas</label><input name="installments" type="number" defaultValue={preFilledData?.installments || 0} placeholder="0" /></div>
-                 <div><label>Monto Crédito</label><input name="credit_amount" type="number" defaultValue={preFilledData?.credit_amount || 0} placeholder="0" /></div>
+                 <div><label>Entrega Contado</label><input name="delivery_amount" type="number" onWheel={(e) => e.target.blur()} defaultValue={preFilledData?.delivery_amount || 0} placeholder="0" /></div>
+                 <div><label>Cuotas</label><input name="installments" type="number" onWheel={(e) => e.target.blur()} defaultValue={preFilledData?.installments || 0} placeholder="0" /></div>
+                 <div><label>Monto Crédito</label><input name="credit_amount" type="number" onWheel={(e) => e.target.blur()} defaultValue={preFilledData?.credit_amount || 0} placeholder="0" /></div>
               </div>
 
               <label style={{ marginTop: '16px' }}>Monto Total (Total Operación)</label>
-              <input name="amount" type="number" defaultValue={preFilledData?.amount || 0} placeholder="0.00" />
+              <input name="amount" type="number" onWheel={(e) => e.target.blur()} defaultValue={preFilledData?.amount || 0} placeholder="0.00" />
               
               <div style={{ marginTop: '24px', padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -682,7 +682,7 @@ function App() {
                       </div>
                     </div>
                     <label style={{ fontSize: '11px' }}>Valuación</label>
-                    <input type="number" value={v.valuation} onChange={(e) => handleTradeInChange(index, 'valuation', e.target.value)} placeholder="0.00" />
+                    <input type="number" onWheel={(e) => e.target.blur()} value={v.valuation} onChange={(e) => handleTradeInChange(index, 'valuation', e.target.value)} placeholder="0.00" />
                   </div>
                 ))}
               </div>
