@@ -69,7 +69,7 @@ export function StockTable({ stock, onSellVehicle }) {
                 </td>
                 <td style={{ padding: '16px' }}>
                   <div style={{ fontWeight: '700' }}>
-                    USD {item.valuation.toLocaleString()}
+                    USD {(item.valuation || 0).toLocaleString()}
                   </div>
                 </td>
                 <td style={{ padding: '16px' }}>

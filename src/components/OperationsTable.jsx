@@ -47,7 +47,7 @@ export function OperationsTable({ operations, onSelectOperation, onDeleteOperati
                 <td style={{ padding: '16px' }}>{op.buyer}</td>
                 <td style={{ padding: '16px' }}>
                   <div style={{ fontWeight: '700' }}>
-                    {op.currency} {op.total_amount.toLocaleString()}
+                    {op.currency} {(op.total_amount || 0).toLocaleString()}
                   </div>
                 </td>
                 <td style={{ padding: '16px' }}>

@@ -77,7 +77,7 @@ function App() {
               description: v.description,
               chapa: v.chapa,
               chasis: v.chasis,
-              valuation: v.role === 'principal' ? op.total_amount : (v.valuation || 0),
+              valuation: v.role === 'principal' ? (op.total_amount || 0) : (v.valuation || 0),
               entry_date: op.date,
               source_type: isPrincipalEntry ? (isRescision ? 'RESCISIÓN' : 'COMPRA') : 'PARTE PAGO RECIBIDO',
               operation_id: op.id
