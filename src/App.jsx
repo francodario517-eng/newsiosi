@@ -81,13 +81,16 @@ function App() {
     }
   }
 
-  const handleOpenBranchModal = (nodeData) => {
+  const handleOpenBranchModal = (vehicleInfo) => {
     setPreFilledData({
-      description: nodeData.trade_in?.description || nodeData.vehicle_description,
-      chapa: nodeData.trade_in?.chapa || nodeData.chapa,
-      chasis: nodeData.trade_in?.chasis || nodeData.chasis,
-      parentId: nodeData.operation_id
+      description: vehicleInfo.description,
+      chapa: vehicleInfo.chapa,
+      chasis: vehicleInfo.chasis,
+      parentId: vehicleInfo.operation_id,
+      type: 'Venta' // Default to sale for branches
     });
+    setEditingOperation(null);
+    setTradeInVehicles([]);
     setShowModal(true);
   }
 

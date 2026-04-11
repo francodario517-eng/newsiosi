@@ -41,9 +41,30 @@ const VehicleNode = ({ data }) => {
       </div>
 
       <div style={{ marginBottom: '16px' }}>
-        <a href="#" style={{ color: '#60a5fa', textDecoration: 'underline', marginBottom: '2px', display: 'block' }}>
-          {data.vehicle_description}
-        </a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <a href="#" style={{ color: '#60a5fa', textDecoration: 'underline', marginBottom: '2px', display: 'block' }}>
+            {data.vehicle_description}
+          </a>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (data.onAddBranch) data.onAddBranch({
+                description: data.vehicle_description,
+                chapa: data.chapa,
+                chasis: data.chasis,
+                operation_id: data.operation_id
+              });
+            }}
+            title="Crear rama desde este vehículo"
+            style={{ 
+              background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              padding: 0, color: 'white', flexShrink: 0
+            }}
+          >
+            <PlusCircle size={12} />
+          </button>
+        </div>
         <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>
           CHAPA: {data.chapa || 'N/A'}
         </div>
@@ -63,9 +84,30 @@ const VehicleNode = ({ data }) => {
         <div key={idx} style={{ marginTop: '16px', borderTop: idx > 0 ? '1px dashed #333' : 'none', paddingTop: idx > 0 ? '12px' : '0' }}>
           <div>A- Vehiculo Entregado como Parte de pago {data.trade_ins.length > 1 ? `#${idx + 1}` : ''}</div>
           <div style={{ margin: '4px 0' }}>A- Vehiculo</div>
-          <a href="#" style={{ color: '#60a5fa', textDecoration: 'underline', display: 'block' }}>
-            {t.description}
-          </a>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <a href="#" style={{ color: '#60a5fa', textDecoration: 'underline', display: 'block' }}>
+              {t.description}
+            </a>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (data.onAddBranch) data.onAddBranch({
+                  description: t.description,
+                  chapa: t.chapa,
+                  chasis: t.chasis,
+                  operation_id: data.operation_id
+                });
+              }}
+              title="Crear rama desde este vehículo"
+              style={{ 
+                background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                padding: 0, color: 'white', flexShrink: 0
+              }}
+            >
+              <PlusCircle size={12} />
+            </button>
+          </div>
           <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>CHAPA: {t.chapa || 'N/A'}</div>
           <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>CHASIS: {t.chasis || 'N/A'}</div>
           <div style={{ marginTop: '4px' }}>A- MONTO VEHICULO {t.amount?.toLocaleString()}</div>
@@ -76,24 +118,9 @@ const VehicleNode = ({ data }) => {
         Monto Total {data.currency} {data.total_amount?.toLocaleString()}
       </div>
 
-      {/* Action Handle with Plus Button */}
+      {/* Action Handle */}
       <div style={{ position: 'absolute', right: '-12px', top: '50%', transform: 'translateY(-50%)', zIndex: 10 }}>
         <Handle type="source" position={Position.Right} style={{ background: 'var(--primary)', border: 'none', width: '12px', height: '12px' }} />
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            if (data.onAddBranch) data.onAddBranch(data);
-          }}
-          className="btn-add-branch"
-          style={{ 
-            position: 'absolute', left: '16px', top: '-10px', background: 'var(--primary)', 
-            border: 'none', borderRadius: '50%', width: '24px', height: '24px', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-            padding: 0, color: 'white', boxShadow: '0 0 10px var(--primary)'
-          }}
-        >
-          <PlusCircle size={16} />
-        </button>
       </div>
     </div>
   );
