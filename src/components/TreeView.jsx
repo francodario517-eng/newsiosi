@@ -131,11 +131,7 @@ const nodeTypes = {
   vehicle: VehicleNode,
 };
 
-const defaultEdgeOptions = {
-  type: 'step',
-  animated: false,
-  style: { stroke: '#aa3bff', strokeWidth: 3 },
-};
+
 
 export function TreeView({ data, onAddBranch, highlightedId, isLoading }) {
   const { nodes, edges } = data || { nodes: [], edges: [] };
@@ -163,11 +159,10 @@ export function TreeView({ data, onAddBranch, highlightedId, isLoading }) {
           nodes={styledNodes}
           edges={edges}
           nodeTypes={nodeTypes}
-          defaultEdgeOptions={defaultEdgeOptions}
           fitView
           style={{ background: 'transparent' }}
         >
-          <Background color="#111" gap={20} variant="dots" />
+          <Background color="#333" gap={20} variant="dots" />
           <Controls />
           <MiniMap 
             nodeColor={(n) => n.data.operation_type === 'venta' ? '#ef4444' : '#10b981'}
