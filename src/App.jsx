@@ -234,12 +234,18 @@ function App() {
       // Export the WHOLE lineage if at least one member is in our targeted (filtered) set
       fullLineage.forEach((lineageOp) => {
         processedIds.add(lineageOp.id);
+        const principal = lineageOp.vehicles?.find(v => v.role === 'principal');
+        const tradeIns = lineageOp.vehicles?.filter(v => v.role === 'parte_pago') || [];
+
         exportData.push({
           'ID Cadena': root.id,
           'Fecha': lineageOp.date,
           'Operacion': lineageOp.operation_type.toUpperCase(),
           'Comprador/Vendedor': lineageOp.buyer,
-          'Vehículos': lineageOp.vehicles.map(v => `${v.description} (CHAPA: ${v.chapa || 'N/A'}, CHASIS: ${v.chasis || 'N/A'})`).join(' | '),
+          'Vehículo Principal': principal?.description || 'N/A',
+          'Chapa': principal?.chapa || 'N/A',
+          'Chasis': principal?.chasis || 'N/A',
+          'Parte de Pago': tradeIns.map(v => `${v.description} (${v.chapa || 'S/C'})`).join(' | '),
           'Monto Operación': lineageOp.total_amount,
           'Costo Inversión (Origen)': root.total_amount,
           'Ganancia Neta': stats.totalProfit,
@@ -256,7 +262,7 @@ function App() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte Filtrado");
     
     const wscols = [
-      {wch: 12}, {wch: 12}, {wch: 15}, {wch: 40}, {wch: 60}, {wch: 15}, {wch: 25}, {wch: 22}, {wch: 15}
+      {wch: 12}, {wch: 12}, {wch: 15}, {wch: 30}, {wch: 30}, {wch: 15}, {wch: 25}, {wch: 40}, {wch: 15}, {wch: 22}, {wch: 15}, {wch: 15}
     ];
     worksheet['!cols'] = wscols;
 
