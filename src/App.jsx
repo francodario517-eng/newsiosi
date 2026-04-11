@@ -258,7 +258,7 @@ function App() {
       <aside className="sidebar">
         <div className="logo-section">
           <Car size={32} color="var(--primary)" />
-          <h2 style={{ color: 'white', marginTop: '12px' }}>VTS Pro</h2>
+          <h2 style={{ color: 'white', marginTop: '12px', letterSpacing: '1px' }}>MH</h2>
         </div>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <button className={`btn ${activeTab === 'operations' ? 'btn-primary' : 'btn-outline'}`} onClick={() => { setActiveTab('operations'); setSelectedTraceability(null); }} style={{ width: '100%', justifyContent: 'flex-start' }}><ArrowLeftRight size={20} /> Operaciones</button>

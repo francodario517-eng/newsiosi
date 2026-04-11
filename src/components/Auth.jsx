@@ -6,7 +6,6 @@ export function Auth({ onSession }) {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState(null);
 
   const handleAuth = async (e) => {
@@ -15,15 +14,9 @@ export function Auth({ onSession }) {
     setError(null);
     
     try {
-      if (isSignUp) {
-        const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
-        if (signUpError) throw signUpError;
-        alert('Revisá tu email para confirmar el registro.');
-      } else {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError) throw signInError;
-        if (data.session) onSession(data.session);
-      }
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
+      if (data.session) onSession(data.session);
     } catch (err) {
       setError(err.message === 'Invalid login credentials' ? 'Credenciales inválidas' : err.message);
     } finally {
@@ -60,9 +53,9 @@ export function Auth({ onSession }) {
           <Car size={32} color="var(--primary)" />
         </div>
         
-        <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>VTS Pro</h1>
+        <h1 style={{ fontSize: '32px', marginBottom: '8px', letterSpacing: '2px', fontWeight: '800' }}>MH</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '32px' }}>
-          {isSignUp ? 'Creá tu cuenta de administrador' : 'Ingresá al panel de control'}
+          MOTOR HAUS - Panel de Control
         </p>
 
         {error && (
@@ -88,7 +81,7 @@ export function Auth({ onSession }) {
                 type="email" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@email.com" 
+                placeholder="usuario@motorhaus.com" 
                 required
                 style={{ paddingLeft: '40px', marginBottom: 0 }}
               />
@@ -116,18 +109,13 @@ export function Auth({ onSession }) {
             className="btn btn-primary" 
             style={{ width: '100%', height: '48px', justifyContent: 'center' }}
           >
-            {loading ? <Loader className="animate-spin" size={20} /> : (isSignUp ? 'Registrarse' : 'Entrar')}
+            {loading ? <Loader className="animate-spin" size={20} /> : 'INICIAR SESIÓN'}
           </button>
         </form>
-
-        <div style={{ marginTop: '24px' }}>
-          <button 
-            onClick={() => setIsSignUp(!isSignUp)}
-            style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '13px' }}
-          >
-            {isSignUp ? '¿Ya tenés cuenta? Inicia sesión' : '¿No tenés cuenta? Registrate'}
-          </button>
-        </div>
+      </div>
+    </div>
+  );
+}
       </div>
     </div>
   );
