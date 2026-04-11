@@ -241,7 +241,6 @@ export const db = {
             })),
           raw_data: {
             ...op,
-            date: new Date(op.date).toLocaleDateString('es-PY', { timeZone: 'UTC' }),
             parentId: op.parent_id,
             vehicles: op.vehicles || []
           }

@@ -164,7 +164,18 @@ function App() {
 
   const handleEditOperation = (op) => {
     setEditingOperation(op);
-    const dateInput = op.date.split('/').reverse().join('-');
+    let dateInput = op.date;
+    if (op.date.includes('/')) {
+      dateInput = op.date.split('/').reverse().join('-');
+    } else if (op.date.includes('-') && op.date.split('-')[0].length === 2) {
+      // Handle cases like DD-MM-YYYY if they exist
+      dateInput = op.date.split('-').reverse().join('-');
+    }
+    // ensure leading zeros for HTML date input (YYYY-MM-DD)
+    if (dateInput.match(/^\d{4}-\d{1,2}-\d{1,2}$/)) {
+      const parts = dateInput.split('-');
+      dateInput = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+    }
     setPreFilledData({
        id: op.id,
        type: op.operation_type.charAt(0).toUpperCase() + op.operation_type.slice(1),
@@ -229,7 +240,12 @@ function App() {
       user_id: session.user.id,
       operation_type: formData.get('type').toLowerCase(),
       payment_type: formData.get('payment').toLowerCase(),
-      date: new Date(formData.get('date')).toLocaleDateString('es-PY'), 
+      date: (() => {
+        const dateVal = formData.get('date');
+        if (!dateVal) return new Date().toLocaleDateString('es-PY');
+        const [y, m, d] = dateVal.split('-');
+        return `${d}/${m}/${y}`;
+      })(), 
       currency: 'USD',
       total_amount: Number(formData.get('amount')),
       buyer: formData.get('buyer'),
