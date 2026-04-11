@@ -46,9 +46,10 @@ function App() {
     const exitCounts = new Map(); // identifier -> count
 
     operations.forEach(op => {
-      const isVenta = op.operation_type.toLowerCase() === 'venta';
-      const isCompra = op.operation_type.toLowerCase() === 'compra';
-      const isRescision = op.operation_type.toLowerCase() === 'rescisión';
+      const type = (op.operation_type || '').toLowerCase();
+      const isVenta = type === 'venta';
+      const isCompra = type === 'compra';
+      const isRescision = type === 'rescisión';
 
       // Record Exits
       op.vehicles.forEach(v => {
