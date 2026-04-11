@@ -240,19 +240,25 @@ function App() {
       parentId: editingOperation?.parentId || preFilledData?.parentId
     };
 
-    if (editingOperation) {
-      await db.updateOperation(editingOperation.id, opData);
-    } else {
-      await db.addOperation(opData);
-    }
+    try {
+      if (editingOperation) {
+        await db.updateOperation(editingOperation.id, opData);
+      } else {
+        await db.addOperation(opData);
+      }
 
-    setShowModal(false);
-    setEditingOperation(null);
-    setPreFilledData(null);
-    setTradeInVehicles([]);
-    
-    if (selectedTraceability) {
-       handleSelectOperation(editingOperation || opData);
+      setShowModal(false);
+      setEditingOperation(null);
+      setPreFilledData(null);
+      setTradeInVehicles([]);
+      
+      // Force refresh of the tree if we were looking at one
+      if (selectedTraceability || highlightedId) {
+         handleSelectOperation({ ...opData, id: editingOperation?.id });
+      }
+    } catch (err) {
+      console.error("Error al guardar operación:", err);
+      alert("Error al guardar: " + (err.message || "Error desconocido"));
     }
   }
 
