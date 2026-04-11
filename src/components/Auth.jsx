@@ -116,7 +116,3 @@ export function Auth({ onSession }) {
     </div>
   );
 }
-      </div>
-    </div>
-  );
-}
