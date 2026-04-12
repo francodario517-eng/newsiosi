@@ -434,29 +434,34 @@ function App() {
   }
 
   const isDateInRange = (dateStr) => {
-    const [d, m, y] = dateStr.split('/').map(Number);
-    const date = new Date(y, m - 1, d);
-    const now = new Date(2026, 3, 11);
-
-    switch (period) {
-      case 'today': return date.toDateString() === now.toDateString();
-      case 'week': {
-        const start = new Date(now); start.setDate(now.getDate() - now.getDay());
-        return date >= start && date <= now;
+    if (!dateStr || typeof dateStr !== 'string' || !dateStr.includes('/')) return true;
+    try {
+      const [d, m, y] = dateStr.split('/').map(Number);
+      const date = new Date(y, m - 1, d);
+      const now = new Date();
+      
+      switch (period) {
+        case 'today': return date.toDateString() === now.toDateString();
+        case 'week': {
+          const start = new Date(now); start.setDate(now.getDate() - now.getDay());
+          return date >= start && date <= now;
+        }
+        case 'month': return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        case 'lastMonth': {
+          const last = new Date(now); last.setMonth(now.getMonth() - 1);
+          return date.getMonth() === last.getMonth() && date.getFullYear() === last.getFullYear();
+        }
+        case 'year': return date.getFullYear() === now.getFullYear();
+        case 'lastYear': return date.getFullYear() === now.getFullYear() - 1;
+        case 'custom': {
+          if (!customRange.start || !customRange.end) return true;
+          const s = new Date(customRange.start); const e = new Date(customRange.end);
+          return date >= s && date <= e;
+        }
+        default: return true;
       }
-      case 'month': return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-      case 'lastMonth': {
-        const last = new Date(now); last.setMonth(now.getMonth() - 1);
-        return date.getMonth() === last.getMonth() && date.getFullYear() === last.getFullYear();
-      }
-      case 'year': return date.getFullYear() === now.getFullYear();
-      case 'lastYear': return date.getFullYear() === now.getFullYear() - 1;
-      case 'custom': {
-        if (!customRange.start || !customRange.end) return true;
-        const s = new Date(customRange.start); const e = new Date(customRange.end);
-        return date >= s && date <= e;
-      }
-      default: return true;
+    } catch (e) {
+      return true;
     }
   };
 

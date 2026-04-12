@@ -18,12 +18,13 @@ export const financials = {
 
     nodes.forEach(node => {
       const { operation_type, total_amount, trade_ins } = node.data;
+      const amount = Number(total_amount) || 0;
       
       if (operation_type === 'venta') {
-        totalRevenue += total_amount;
+        totalRevenue += amount;
         if (trade_ins) tradeInCount += trade_ins.length;
       } else if (operation_type === 'compra') {
-        totalInvestment += total_amount;
+        totalInvestment += amount;
       }
     });
 
