@@ -245,7 +245,7 @@ export const db = {
             vehicles: op.vehicles || []
           }
         },
-        position: { x: depth * 750, y: vIdx * 500 + 50 }
+        position: { x: depth * 750, y: vIdx * 800 + 50 }
       });
 
       if (op.parent_id) {
