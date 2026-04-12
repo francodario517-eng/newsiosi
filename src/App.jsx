@@ -264,10 +264,15 @@ function App() {
     const dateVal = formData.get('date');
     const opData = {
       user_id: session.user.id,
-      operation_type: formData.get('type'),
-      payment_type: formData.get('payment'),
-      date: dateVal,
-      currency: formData.get('currency'),
+      operation_type: formData.get('type').toLowerCase(),
+      payment_type: formData.get('payment').toLowerCase(),
+      date: (() => {
+        const dVal = formData.get('date');
+        if (!dVal) return new Date().toLocaleDateString('es-PY');
+        const [y, m, d] = dVal.split('-');
+        return `${d}/${m}/${y}`;
+      })(), 
+      currency: formData.get('currency') || 'USD',
       total_amount: parseMoney(formData.get('amount')),
       buyer: formData.get('buyer'),
       delivery_amount: parseMoney(formData.get('delivery_amount')),
