@@ -40,6 +40,18 @@ function App() {
   const [isTreeLoading, setIsTreeLoading] = useState(false)
   const [session, setSession] = useState(null)
   const [editingOperation, setEditingOperation] = useState(null)
+  
+  // Money formatting helpers
+  const formatMoney = (val) => {
+    if (val === null || val === undefined || val === '') return '';
+    const stringVal = val.toString().replace(/\D/g, '');
+    return stringVal.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const parseMoney = (val) => {
+    if (!val) return 0;
+    return Number(val.toString().replace(/\./g, '')) || 0;
+  };
 
   const stockVehicles = useMemo(() => {
     const entryMap = new Map(); // identifier -> entry data[]
@@ -220,17 +232,15 @@ function App() {
        chapa: op.vehicles?.find(v => v.role === 'principal')?.chapa || '',
        chasis: op.vehicles?.find(v => v.role === 'principal')?.chasis || '',
     });
-    setTradeInVehicles(op.vehicles?.filter(v => v.role === 'parte_pago').map(v => ({
-      description: v.description,
-      chapa: v.chapa,
-      chasis: v.chasis,
-      valuation: v.valuation
-    })) || []);
+    setTradeInVehicles((editingOperation.vehicles || [])
+        .filter(v => v.role === 'parte_pago')
+        .map(v => ({ ...v, valuation: formatMoney(v.valuation) }))
+      );
     setShowModal(true);
   }
 
   const handleAddTradeIn = () => {
-    setTradeInVehicles([...tradeInVehicles, { description: '', chapa: '', chasis: '', valuation: 0 }]);
+    setTradeInVehicles([...tradeInVehicles, { description: '', chapa: '', chasis: '', valuation: '' }]);
   }
 
   const handleRemoveTradeIn = (index) => {
@@ -238,52 +248,45 @@ function App() {
   }
 
   const handleTradeInChange = (index, field, value) => {
-    const updated = [...tradeInVehicles];
-    updated[index][field] = value;
-    setTradeInVehicles(updated);
+    const newTradeIns = [...tradeInVehicles];
+    if (field === 'valuation') {
+      newTradeIns[index][field] = formatMoney(value);
+    } else {
+      newTradeIns[index][field] = value;
+    }
+    setTradeInVehicles(newTradeIns);
   }
 
   const handleSaveOperation = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     
-    const vehiclesData = [{ 
-      chapa: formData.get('chapa'),
-      chasis: formData.get('chasis'),
-      description: formData.get('description'), 
-      role: 'principal' 
-    }];
-
-    tradeInVehicles.forEach(v => {
-      if (v.description) {
-        vehiclesData.push({
-          chapa: v.chapa,
-          chasis: v.chasis,
-          description: v.description,
-          role: 'parte_pago',
-          valuation: Number(v.valuation || 0)
-        });
-      }
-    });
-
+    const dateVal = formData.get('date');
     const opData = {
       user_id: session.user.id,
-      operation_type: formData.get('type').toLowerCase(),
-      payment_type: formData.get('payment').toLowerCase(),
-      date: (() => {
-        const dateVal = formData.get('date');
-        if (!dateVal) return new Date().toLocaleDateString('es-PY');
-        const [y, m, d] = dateVal.split('-');
-        return `${d}/${m}/${y}`;
-      })(), 
-      currency: 'USD',
-      total_amount: Number(formData.get('amount')),
+      operation_type: formData.get('type'),
+      payment_type: formData.get('payment'),
+      date: dateVal,
+      currency: formData.get('currency'),
+      total_amount: parseMoney(formData.get('amount')),
       buyer: formData.get('buyer'),
-      delivery_amount: Number(formData.get('delivery_amount') || 0),
-      installments: Number(formData.get('installments') || 0),
-      credit_amount: Number(formData.get('credit_amount') || 0),
-      vehicles: vehiclesData,
-      parentId: editingOperation?.parentId || preFilledData?.parentId
+      delivery_amount: parseMoney(formData.get('delivery_amount')),
+      installments: Number(formData.get('installments')) || 0,
+      credit_amount: parseMoney(formData.get('credit_amount')),
+      parentId: preFilledData?.operation_id || editingOperation?.parentId || null,
+      vehicles: [
+        {
+          chapa: formData.get('chapa'),
+          chasis: formData.get('chasis'),
+          description: formData.get('description'),
+          role: 'principal'
+        },
+        ...tradeInVehicles.map(v => ({
+          ...v,
+          role: 'parte_pago',
+          valuation: parseMoney(v.valuation)
+        }))
+      ]
     };
 
     try {
@@ -673,13 +676,13 @@ function App() {
               <input name="buyer" defaultValue={preFilledData?.buyer || ''} placeholder="Nombre completo" />
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '16px' }}>
-                 <div><label>Entrega Contado</label><input name="delivery_amount" type="number" defaultValue={preFilledData?.delivery_amount || 0} placeholder="0" /></div>
+                 <div><label>Entrega Contado</label><input name="delivery_amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(preFilledData?.delivery_amount || 0)} placeholder="0" /></div>
                  <div><label>Cuotas</label><input name="installments" type="number" defaultValue={preFilledData?.installments || 0} placeholder="0" /></div>
-                 <div><label>Monto Crédito</label><input name="credit_amount" type="number" defaultValue={preFilledData?.credit_amount || 0} placeholder="0" /></div>
+                 <div><label>Monto Crédito</label><input name="credit_amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(preFilledData?.credit_amount || 0)} placeholder="0" /></div>
               </div>
 
               <label style={{ marginTop: '16px' }}>Monto Total (Total Operación)</label>
-              <input name="amount" type="number" defaultValue={preFilledData?.amount || 0} placeholder="0.00" />
+              <input name="amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(preFilledData?.amount || 0)} placeholder="0.00" />
               
               <div style={{ marginTop: '24px', padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -719,7 +722,7 @@ function App() {
                       </div>
                     </div>
                     <label style={{ fontSize: '11px' }}>Valuación</label>
-                    <input type="number" value={v.valuation} onChange={(e) => handleTradeInChange(index, 'valuation', e.target.value)} placeholder="0.00" />
+                    <input type="text" value={v.valuation} onChange={(e) => handleTradeInChange(index, 'valuation', e.target.value)} placeholder="0.00" />
                   </div>
                 ))}
               </div>
