@@ -186,7 +186,7 @@ export const db = {
     ops.forEach(op => {
       if (op.parent_id) {
         // The principal vehicle of a child operation is the one that was sold from the parent
-        const principal = op.vehicles.find(v => v.role === 'principal');
+        const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
         if (principal) {
           const id = (principal.chasis || principal.chapa || '').trim().toUpperCase();
           if (id) soldInChain.add(`${op.parent_id}-${id}`);
@@ -204,8 +204,8 @@ export const db = {
       depthCounts[depth] = vIdx + 1;
 
       const nodeId = `node-${op.id}`;
-      const searchedV = op.vehicles.find(veh => veh.chasis === vehicleId || veh.chapa === vehicleId);
-      const principalV = op.vehicles.find(veh => veh.role === 'principal');
+      const searchedV = (op.vehicles || []).find(veh => veh && (veh.chasis === vehicleId || veh.chapa === vehicleId));
+      const principalV = (op.vehicles || []).find(veh => veh && veh.role === 'principal');
       const displayV = searchedV || principalV;
       
       const principalId = (displayV?.chasis || displayV?.chapa || '').trim().toUpperCase();
@@ -229,8 +229,8 @@ export const db = {
           delivery_amount: op.delivery_amount,
           installments: op.installments,
           credit_amount: op.credit_amount,
-          trade_ins: op.vehicles
-            .filter(veh => veh.role === 'parte_pago')
+          trade_ins: (op.vehicles || [])
+            .filter(veh => veh && veh.role === 'parte_pago')
             .map(t => ({
               description: t.description,
               amount: t.valuation,

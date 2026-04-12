@@ -144,7 +144,7 @@ const VehicleNode = ({ data }) => {
         <div>Monto Credito {data.credit_amount?.toLocaleString()}</div>
       </div>
 
-      {data.trade_ins && data.trade_ins.length > 0 && data.trade_ins.map((t, idx) => (
+      {data.trade_ins && data.trade_ins.filter(Boolean).length > 0 && data.trade_ins.filter(Boolean).map((t, idx) => (
         <div key={idx} style={{ marginTop: '16px', borderTop: idx > 0 ? '1px dashed #333' : 'none', paddingTop: idx > 0 ? '12px' : '0' }}>
           <div>A- Vehiculo Entregado como Parte de pago {data.trade_ins.length > 1 ? `#${idx + 1}` : ''}</div>
           <div style={{ margin: '4px 0' }}>A- Vehiculo</div>

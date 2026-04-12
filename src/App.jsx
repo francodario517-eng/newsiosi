@@ -1,47 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react'
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error("ErrorBoundary caught an error", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ 
-          height: '100vh', display: 'flex', flexDirection: 'column', 
-          alignItems: 'center', justifyContent: 'center', background: '#0a0b10', color: 'white',
-          textAlign: 'center', padding: '20px'
-        }}>
-          <h2 style={{ marginBottom: '16px' }}>MANTENIMIENTO / ERROR DE CARGA</h2>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>
-            Hubo un error al procesar los datos. Esto puede deberse a la caché del navegador.
-          </p>
-          <button 
-            className="btn btn-primary" 
-            onClick={() => {
-              localStorage.clear();
-              window.location.reload();
-            }}
-          >
-            LIMPIAR CACHÉ Y REINTENTAR
-          </button>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
 import { 
   Car, 
   ArrowLeftRight, 
@@ -95,7 +52,8 @@ function App() {
       const isRescision = type === 'rescisión';
 
       // Record Exits
-      op.vehicles.forEach(v => {
+      op.vehicles?.forEach(v => {
+        if (!v) return;
         const isPrincipalExit = isVenta && v.role === 'principal';
         const isTradeInExit = isCompra && v.role === 'parte_pago';
         
@@ -108,7 +66,8 @@ function App() {
       });
 
       // Record Entries
-      op.vehicles.forEach(v => {
+      op.vehicles?.forEach(v => {
+        if (!v) return;
         const isPrincipalEntry = (isCompra || isRescision) && v.role === 'principal';
         const isTradeInEntry = isVenta && v.role === 'parte_pago';
         
@@ -471,9 +430,11 @@ function App() {
 
     const matchesBuyer = (o.buyer || '').toLowerCase().includes(query);
     const matchesVehicles = (o.vehicles || []).some(v => 
-      (v.chapa || '').toLowerCase().includes(query) || 
-      (v.chasis || '').toLowerCase().includes(query) || 
-      (v.description || '').toLowerCase().includes(query)
+      v && (
+        (v.chapa || '').toLowerCase().includes(query) || 
+        (v.chasis || '').toLowerCase().includes(query) || 
+        (v.description || '').toLowerCase().includes(query)
+      )
     );
     
     // Also search in general operation fields like currency or payment type
@@ -488,8 +449,7 @@ function App() {
   }
 
   return (
-    <ErrorBoundary>
-      <div className="app-container">
+    <div className="app-container">
       {/* Sidebar - Same as before */}
       <aside className="sidebar">
         <div className="logo-section">
@@ -773,8 +733,7 @@ function App() {
           </div>
         </div>
       )}
-      </div>
-    </ErrorBoundary>
+    </div>
   )
 }
 
