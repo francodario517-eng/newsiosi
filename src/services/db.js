@@ -162,11 +162,19 @@ export const db = {
             const p = allOps.find(o => o.id === op.parent_id);
             if (p) { treeOps.push(p); changed = true; }
           }
-          // Smart parent (current principal was a trade-in in parent)
+          // Smart parent: Either current principal was a trade-in in parent, 
+          // OR it was the principal vehicle in a prior Purchase/Rescision.
           const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
           if (principal) {
             const pId = getVehId(principal);
-            const smartParent = allOps.find(o => !currentIds.has(o.id) && (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId));
+            const smartParent = allOps.find(o => !currentIds.has(o.id) && (
+              // Case 1: Was a trade-in
+              (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId) ||
+              // Case 2: Was principal in a COMPRA or RESCISION
+              ((o.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === 'compra' || 
+                o.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === 'rescision') && 
+               (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === pId))
+            ));
             if (smartParent) { treeOps.push(smartParent); changed = true; }
           }
 
@@ -175,7 +183,9 @@ export const db = {
           const children = allOps.filter(o => o.parent_id === op.id && !currentIds.has(o.id));
           if (children.length > 0) { treeOps.push(...children); changed = true; }
           
-          // Smart children (current trade-in is principal in child)
+          // Smart children:
+          // Either current trade-in is principal in child,
+          // OR current principal is principal in a future Venta.
           const tradeIns = (op.vehicles || []).filter(v => v && v.role === 'parte_pago');
           tradeIns.forEach(t => {
             const tId = getVehId(t);
@@ -183,6 +193,16 @@ export const db = {
             const smartChild = allOps.find(o => !currentIds.has(o.id) && (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === tId));
             if (smartChild) { treeOps.push(smartChild); changed = true; }
           });
+
+          // Principal to future sale check
+          const opTypeClean = op.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          if (opTypeClean === 'compra' || opTypeClean === 'rescision') {
+             const vId = getVehId(principal);
+             if (vId) {
+               const smartChild = allOps.find(o => !currentIds.has(o.id) && o.operation_type?.toLowerCase() === 'venta' && (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === vId));
+               if (smartChild) { treeOps.push(smartChild); changed = true; }
+             }
+          }
         }
       });
       if (currentIds.size === treeOps.length) changed = false;
@@ -202,7 +222,18 @@ export const db = {
       // Find parent
       let parentId = op.parent_id;
       if (!parentId && pId) {
-        const smartParent = ops.find(o => (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId));
+        // 1. Check if it was a trade-in in some op
+        let smartParent = ops.find(o => (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId));
+        
+        // 2. Check if it was principal in a purchase
+        const opType = op.operation_type?.toLowerCase();
+        if (!smartParent && (opType === 'venta' || opType === 'remate')) {
+          smartParent = ops.find(o => {
+            const pType = o.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return (pType === 'compra' || pType === 'rescision') && (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === pId);
+          });
+        }
+
         if (smartParent) parentId = smartParent.id;
       }
 
