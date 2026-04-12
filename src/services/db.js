@@ -139,37 +139,82 @@ export const db = {
   },
 
   getVehicleTraceability: async (vehicleId) => {
-    const { data: ops, error } = await supabase.rpc('get_operation_genealogy', { 
-      vehicle_id_search: vehicleId 
-    });
+    const allOps = await db.getOperations();
+    if (!allOps || allOps.length === 0) return { nodes: [], edges: [] };
 
-    if (error) {
-      console.error('Error fetching genealogy:', error);
-      return { nodes: [], edges: [] };
+    const getVehId = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
+    const searchId = vehicleId.trim().toUpperCase();
+
+    // 1. Initial set: ops containing search vehicleId
+    let treeOps = allOps.filter(op => (op.vehicles || []).some(v => getVehId(v) === searchId));
+    
+    // 2. Expand recursively in memory
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const currentIds = new Set(treeOps.map(o => o.id));
+      
+      allOps.forEach(op => {
+        if (currentIds.has(op.id)) {
+          // A. Upward Expansion (Parents)
+          // Explicit parent
+          if (op.parent_id && !currentIds.has(op.parent_id)) {
+            const p = allOps.find(o => o.id === op.parent_id);
+            if (p) { treeOps.push(p); changed = true; }
+          }
+          // Smart parent (current principal was a trade-in in parent)
+          const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
+          if (principal) {
+            const pId = getVehId(principal);
+            const smartParent = allOps.find(o => !currentIds.has(o.id) && (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId));
+            if (smartParent) { treeOps.push(smartParent); changed = true; }
+          }
+
+          // B. Downward Expansion (Children)
+          // Explicit children
+          const children = allOps.filter(o => o.parent_id === op.id && !currentIds.has(o.id));
+          if (children.length > 0) { treeOps.push(...children); changed = true; }
+          
+          // Smart children (current trade-in is principal in child)
+          const tradeIns = (op.vehicles || []).filter(v => v && v.role === 'parte_pago');
+          tradeIns.forEach(t => {
+            const tId = getVehId(t);
+            if (!tId) return;
+            const smartChild = allOps.find(o => !currentIds.has(o.id) && (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === tId));
+            if (smartChild) { treeOps.push(smartChild); changed = true; }
+          });
+        }
+      });
+      if (currentIds.size === treeOps.length) changed = false;
     }
 
-    if (!ops || ops.length === 0) return { nodes: [], edges: [] };
-
-    const nodes = [];
-    const edges = [];
-    
-    // Build map for hierarchy calculation
+    const ops = treeOps;
     const opMap = new Map();
     ops.forEach(op => {
       opMap.set(op.id, { ...op, children: [], depth: 0 });
     });
 
-    // Link parents to children
+    // Link parents to children for depth calculation (using both explicit and smart links)
     ops.forEach(op => {
-      if (op.parent_id && opMap.has(op.parent_id)) {
-        opMap.get(op.parent_id).children.push(op.id);
+      const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
+      const pId = getVehId(principal);
+      
+      // Find parent
+      let parentId = op.parent_id;
+      if (!parentId && pId) {
+        const smartParent = ops.find(o => (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId));
+        if (smartParent) parentId = smartParent.id;
+      }
+
+      if (parentId && opMap.has(parentId)) {
+        opMap.get(parentId).children.push(op.id);
+        opMap.get(op.id).effectiveParentId = parentId;
       }
     });
 
-    // Find roots (ancestors)
-    const roots = ops.filter(op => !op.parent_id || !opMap.has(op.parent_id));
+    // Find roots
+    const roots = ops.filter(op => !opMap.get(op.id).effectiveParentId);
 
-    // Calc depth per node
     const visited = new Set();
     const setDepth = (id, depth) => {
       if (visited.has(id)) return;
@@ -178,38 +223,30 @@ export const db = {
       entry.depth = Math.max(entry.depth, depth);
       entry.children.forEach(childId => setDepth(childId, depth + 1));
     };
-
     roots.forEach(r => setDepth(r.id, 0));
 
-    // Identify which vehicles in this chain already have a descendant (sold)
+    // Consolidate sold indicators
     const soldInChain = new Set();
     ops.forEach(op => {
-      if (op.parent_id) {
-        // The principal vehicle of a child operation is the one that was sold from the parent
+      const epId = opMap.get(op.id).effectiveParentId;
+      if (epId) {
         const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
-        if (principal) {
-          const id = (principal.chasis || principal.chapa || '').trim().toUpperCase();
-          if (id) soldInChain.add(`${op.parent_id}-${id}`);
-        }
+        const vId = getVehId(principal);
+        if (vId) soldInChain.add(`${epId}-${vId}`);
       }
     });
 
-    // Final sort and position assignment
-    const sortedOps = Array.from(opMap.values()).sort((a, b) => a.depth - b.depth);
+    const nodes = [];
+    const edges = [];
     const depthCounts = {};
 
-    sortedOps.forEach((op) => {
+    Array.from(opMap.values()).sort((a, b) => a.depth - b.depth).forEach((op) => {
       const depth = op.depth;
       const vIdx = depthCounts[depth] || 0;
       depthCounts[depth] = vIdx + 1;
-
       const nodeId = `node-${op.id}`;
-      const searchedV = (op.vehicles || []).find(veh => veh && (veh.chasis === vehicleId || veh.chapa === vehicleId));
-      const principalV = (op.vehicles || []).find(veh => veh && veh.role === 'principal');
-      const displayV = searchedV || principalV;
-      
-      const principalId = (displayV?.chasis || displayV?.chapa || '').trim().toUpperCase();
-      const isPrincipalSold = principalId ? soldInChain.has(`${op.id}-${principalId}`) : false;
+      const principalV = (op.vehicles || []).find(v => v && v.role === 'principal');
+      const pIdStr = getVehId(principalV);
 
       nodes.push({
         id: nodeId,
@@ -220,10 +257,10 @@ export const db = {
           payment_type: op.payment_type,
           date: new Date(op.date).toLocaleDateString('es-PY', { timeZone: 'UTC' }),
           client_name: op.buyer,
-          vehicle_description: displayV?.description || 'Operación de Sistema',
-          chapa: displayV?.chapa || '',
-          chasis: displayV?.chasis || '',
-          isPrincipalSold,
+          vehicle_description: principalV?.description || 'Operación de Sistema',
+          chapa: principalV?.chapa || '',
+          chasis: principalV?.chasis || '',
+          isPrincipalSold: pIdStr ? soldInChain.has(`${op.id}-${pIdStr}`) : false,
           currency: op.currency,
           total_amount: op.total_amount,
           delivery_amount: op.delivery_amount,
@@ -237,24 +274,35 @@ export const db = {
               chapa: t.chapa,
               chasis: t.chasis,
               isExit: op.operation_type === 'compra',
-              isSold: (t.chasis || t.chapa) ? soldInChain.has(`${op.id}-${(t.chasis || t.chapa || '').trim().toUpperCase()}`) : false
+              isSold: getVehId(t) ? soldInChain.has(`${op.id}-${getVehId(t)}`) : false
             })),
-          raw_data: {
-            ...op,
-            parentId: op.parent_id,
-            vehicles: op.vehicles || []
-          }
+          raw_data: op
         },
         position: { x: depth * 750, y: vIdx * 800 + 50 }
       });
 
-      if (op.parent_id) {
+      const epId = opMap.get(op.id).effectiveParentId;
+      if (epId) {
+        let sourceHandle = 'main';
+        const parentOp = opMap.get(epId);
+        const childPrincipal = (op.vehicles || []).find(v => v && v.role === 'principal');
+        if (childPrincipal && parentOp) {
+          const childUid = getVehId(childPrincipal);
+          const pPrincipal = (parentOp.vehicles || []).find(v => v && v.role === 'principal');
+          const pPrincipalUid = getVehId(pPrincipal);
+          if (childUid !== pPrincipalUid) {
+            const tradeIns = (parentOp.vehicles || []).filter(v => v && v.role === 'parte_pago');
+            const tIdx = tradeIns.findIndex(v => getVehId(v) === childUid);
+            if (tIdx !== -1) sourceHandle = `tradein-${tIdx}`;
+          }
+        }
         edges.push({ 
-          id: `e-node-${op.parent_id}-${nodeId}`, 
-          source: `node-${op.parent_id}`, 
+          id: `e-${epId}-${op.id}`, 
+          source: `node-${epId}`, 
+          sourceHandle, 
           target: nodeId, 
           animated: true,
-          style: { stroke: 'var(--primary)', strokeWidth: 2 }
+          style: { stroke: 'var(--primary)', strokeWidth: 2 } 
         });
       }
     });
