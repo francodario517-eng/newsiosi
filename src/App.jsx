@@ -330,7 +330,16 @@ function App() {
     const targetOps = filteredOperations;
     const processedIds = new Set();
     const exportData = [];
-    const getVehId = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
+    const parseDate = (d) => {
+      if (!d) return new Date(0);
+      if (d instanceof Date) return d;
+      const parts = d.split(/[-/]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) return new Date(parts[0], parts[1] - 1, parts[2]); // YYYY-MM-DD
+        return new Date(parts[2], parts[1] - 1, parts[0]); // DD-MM-YYYY
+      }
+      return new Date(d);
+    };
 
     targetOps.forEach(op => {
       if (processedIds.has(op.id)) return;
@@ -364,24 +373,35 @@ function App() {
       const fullChain = Array.from(chainOps).map(id => operations.find(o => o.id === id));
       
       const roots = fullChain.filter(o => {
-          const p = o.parentId ? fullChain.find(p => p.id === o.parentId) : null;
-          if (p) return false;
+          const hasExplicitParent = o.parentId && fullChain.some(p => p.id === o.parentId);
+          if (hasExplicitParent) return false;
+          
           const princ = (o.vehicles || []).find(v => v.role === 'principal');
           const pId = getVehId(princ);
           if (pId) {
-            const hasSmartParent = fullChain.some(other => 
+            const isTradeInOfOther = fullChain.some(other => 
               other.id !== o.id && (other.vehicles || []).some(v => v.role === 'parte_pago' && getVehId(v) === pId)
             );
-            if (hasSmartParent) return false;
+            if (isTradeInOfOther) return false;
+            
+            const earlierOpWithSamePrincipal = fullChain.some(other => 
+              other.id !== o.id && 
+              parseDate(other.date) < parseDate(o.date) && 
+              (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId)
+            );
+            if (earlierOpWithSamePrincipal) return false;
           }
           return true;
       });
+
+      roots.sort((a, b) => parseDate(a.date) - parseDate(b.date));
 
       const pushToExport = (node, depth = 0) => {
         if (processedIds.has(node.id)) return;
         processedIds.add(node.id);
 
         const principal = node.vehicles?.find(v => v.role === 'principal');
+        const pId = getVehId(principal);
         const tradeIns = node.vehicles?.filter(v => v.role === 'parte_pago') || [];
         const indent = depth > 0 ? ' '.repeat(depth * 3) + '↳ ' : '';
 
@@ -406,24 +426,33 @@ function App() {
           '% Comparativa del Prom vs Precio USD': ''
         });
 
-        const children = fullChain.filter(o => o.parentId === node.id);
-        tradeIns.forEach(t => {
-          const tId = getVehId(t);
-          if (tId) {
-            fullChain.filter(o => !processedIds.has(o.id) && (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === tId))
-              .forEach(c => children.push(c));
-          }
+        const children = fullChain.filter(o => {
+            if (processedIds.has(o.id)) return false;
+            if (o.parentId === node.id) return true;
+            
+            const isTradeInChild = tradeIns.some(t => {
+                const tId = getVehId(t);
+                return tId && (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === tId);
+            });
+            if (isTradeInChild) return true;
+
+            if (pId) {
+                const isSameVehLater = (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId) && 
+                                       parseDate(o.date) >= parseDate(node.date);
+                if (isSameVehLater) {
+                    const intermediary = fullChain.some(inter => 
+                        inter.id !== node.id && inter.id !== o.id &&
+                        (inter.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId) &&
+                        parseDate(inter.date) >= parseDate(node.date) &&
+                        parseDate(inter.date) < parseDate(o.date)
+                    );
+                    if (!intermediary) return true;
+                }
+            }
+            return false;
         });
 
-        children.sort((a, b) => {
-            const parseDate = (d) => {
-                if (!d) return new Date(0);
-                const [day, month, year] = d.split('/').map(Number);
-                return new Date(year, month - 1, day);
-            };
-            return parseDate(a.date) - parseDate(b.date);
-        });
-
+        children.sort((a, b) => parseDate(a.date) - parseDate(b.date));
         children.forEach(c => pushToExport(c, depth + 1));
       };
 
