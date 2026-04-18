@@ -50,12 +50,15 @@ export const financials = {
     
     const parseDateHelper = (d) => {
       if (!d) return new Date(0);
-      const parts = d.split(/[-/]/);
+      const parts = d.toString().split(/[-/]/).map(Number);
       if (parts.length === 3) {
-        if (parts[0].length === 4) return new Date(parts[0], parts[1] - 1, parts[2]);
+        // YYYY-MM-DD
+        if (parts[0] > 1000) return new Date(parts[0], parts[1] - 1, parts[2]);
+        // DD-MM-YYYY
         return new Date(parts[2], parts[1] - 1, parts[0]);
       }
-      return new Date(d);
+      const parsed = new Date(d);
+      return isNaN(parsed.getTime()) ? new Date(0) : parsed;
     };
 
     // 1. Calculate Timeline (Annual context from allOperations)

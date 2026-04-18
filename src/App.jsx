@@ -331,15 +331,17 @@ function App() {
     const processedIds = new Set();
     const exportData = [];
     const getVehId = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
-    const parseDate = (d) => {
+    const parseDateHelper = (d) => {
       if (!d) return new Date(0);
-      if (d instanceof Date) return d;
-      const parts = d.toString().split(/[-/]/);
+      const parts = d.toString().split(/[-/]/).map(Number);
       if (parts.length === 3) {
-        if (parts[0].length === 4) return new Date(parts[0], parts[1] - 1, parts[2]); // YYYY-MM-DD
-        return new Date(parts[2], parts[1] - 1, parts[0]); // DD-MM-YYYY
+        // YYYY-MM-DD
+        if (parts[0] > 1000) return new Date(parts[0], parts[1] - 1, parts[2]);
+        // DD-MM-YYYY
+        return new Date(parts[2], parts[1] - 1, parts[0]);
       }
-      return new Date(d);
+      const parsed = new Date(d);
+      return isNaN(parsed.getTime()) ? new Date(0) : parsed;
     };
 
     targetOps.forEach(op => {
@@ -488,10 +490,19 @@ function App() {
   }
 
   const isDateInRange = (dateStr) => {
-    if (!dateStr || typeof dateStr !== 'string' || !dateStr.includes('/')) return true;
+    if (!dateStr || typeof dateStr !== 'string') return true;
     try {
-      const [d, m, y] = dateStr.split('/').map(Number);
-      const date = new Date(y, m - 1, d);
+      const parseLocal = (str) => {
+        const parts = str.split(/[-/]/).map(Number);
+        if (parts.length !== 3) return new Date(str);
+        // If first part is 4 digits, it's YYYY-MM-DD
+        if (parts[0] > 1000) return new Date(parts[0], parts[1] - 1, parts[2]);
+        // Otherwise assume DD-MM-YYYY
+        return new Date(parts[2], parts[1] - 1, parts[0]);
+      };
+
+      const date = parseLocal(dateStr);
+      if (isNaN(date.getTime())) return true;
       const now = new Date();
       
       switch (period) {
