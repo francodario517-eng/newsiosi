@@ -751,7 +751,12 @@ function App() {
                )}
             </div>
           )}
-          {activeTab === 'stats' && <StatsDashboard />}
+          {activeTab === 'stats' && (
+            <StatsDashboard 
+              metrics={financials.getGlobalMetrics(operations)} 
+              stock={stockVehicles}
+            />
+          )}
         </section>
       </main>
 
