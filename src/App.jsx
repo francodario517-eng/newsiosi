@@ -330,10 +330,11 @@ function App() {
     const targetOps = filteredOperations;
     const processedIds = new Set();
     const exportData = [];
+    const getVehId = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
     const parseDate = (d) => {
       if (!d) return new Date(0);
       if (d instanceof Date) return d;
-      const parts = d.split(/[-/]/);
+      const parts = d.toString().split(/[-/]/);
       if (parts.length === 3) {
         if (parts[0].length === 4) return new Date(parts[0], parts[1] - 1, parts[2]); // YYYY-MM-DD
         return new Date(parts[2], parts[1] - 1, parts[0]); // DD-MM-YYYY
