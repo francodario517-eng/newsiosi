@@ -372,14 +372,20 @@ function App() {
           'Fecha': lineageOp.date,
           'Operacion': lineageOp.operation_type.toUpperCase(),
           'Comprador/Vendedor': lineageOp.buyer,
-          'Vehículo Principal': principal?.description || 'N/A',
+          'Vehículo': principal?.description || 'N/A',
+          'Principal': lineageOp.total_amount,
           'Chapa': principal?.chapa || 'N/A',
           'Chasis': principal?.chasis || 'N/A',
-          'Parte de Pago': tradeIns.map(v => `${v.description} (${v.chapa || 'S/C'})`).join(' | '),
-          'Monto Operación': lineageOp.total_amount,
+          'Parte de Pago': tradeIns.reduce((sum, v) => sum + (v.valuation || 0), 0),
+          'Vehículos en Parte de Pago': tradeIns.map(v => `${v.description} (CHAPA: ${v.chapa || 'S/C'})`).join(' | '),
+          'su valor': lineageOp.total_amount,
           'Costo Inversión (Origen)': root.total_amount,
-          'Ganancia Neta': stats.totalProfit,
-          'Estatus': stats.totalProfit > 0 ? 'RENTABLE' : 'PERDIDA'
+          'clasipar': '',
+          'Marketplace': '',
+          'Instagram': '',
+          'Precio Promedio del mercado': '',
+          '# Comparativa del Precio Prom vs Precio USD': '',
+          '% Comparativa del Prom vs Precio USD': ''
         });
       });
 
@@ -392,7 +398,7 @@ function App() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte Filtrado");
     
     const wscols = [
-      {wch: 12}, {wch: 12}, {wch: 15}, {wch: 30}, {wch: 30}, {wch: 15}, {wch: 25}, {wch: 40}, {wch: 15}, {wch: 22}, {wch: 15}, {wch: 15}
+      {wch: 12}, {wch: 12}, {wch: 15}, {wch: 30}, {wch: 30}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 40}, {wch: 15}, {wch: 22}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 25}, {wch: 25}
     ];
     worksheet['!cols'] = wscols;
 
