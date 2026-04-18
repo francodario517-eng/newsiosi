@@ -507,6 +507,16 @@ function App() {
         }
         case 'year': return date.getFullYear() === now.getFullYear();
         case 'lastYear': return date.getFullYear() === now.getFullYear() - 1;
+        case 'thisQuarter': {
+          const currentQ = Math.floor(now.getMonth() / 3);
+          return Math.floor(date.getMonth() / 3) === currentQ && date.getFullYear() === now.getFullYear();
+        }
+        case 'lastQuarter': {
+          const currentQ = Math.floor(now.getMonth() / 3);
+          const lastQ = currentQ === 0 ? 3 : currentQ - 1;
+          const lastQYear = currentQ === 0 ? now.getFullYear() - 1 : now.getFullYear();
+          return Math.floor(date.getMonth() / 3) === lastQ && date.getFullYear() === lastQYear;
+        }
         case 'custom': {
           if (!customRange.start || !customRange.end) return true;
           const s = new Date(customRange.start); const e = new Date(customRange.end);
@@ -589,6 +599,8 @@ function App() {
                 <option value="week" style={{ background: '#1a1b23' }}>Esta Semana</option>
                 <option value="month" style={{ background: '#1a1b23' }}>Este Mes</option>
                 <option value="lastMonth" style={{ background: '#1a1b23' }}>Mes Anterior</option>
+                <option value="thisQuarter" style={{ background: '#1a1b23' }}>Este Trimestre</option>
+                <option value="lastQuarter" style={{ background: '#1a1b23' }}>Trimestre Anterior</option>
                 <option value="year" style={{ background: '#1a1b23' }}>Este Año</option>
                 <option value="lastYear" style={{ background: '#1a1b23' }}>Año Anterior</option>
                 <option value="custom" style={{ background: '#1a1b23' }}>Personalizado</option>
@@ -753,7 +765,7 @@ function App() {
           )}
           {activeTab === 'stats' && (
             <StatsDashboard 
-              metrics={financials.getGlobalMetrics(operations)} 
+              metrics={financials.getGlobalMetrics(operations, filteredOperations)} 
               stock={stockVehicles}
             />
           )}
