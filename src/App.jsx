@@ -374,24 +374,39 @@ function App() {
       const fullChain = Array.from(chainOps).map(id => operations.find(o => o.id === id));
       
       const roots = fullChain.filter(o => {
-          const hasExplicitParent = o.parentId && fullChain.some(p => p.id === o.parentId);
-          if (hasExplicitParent) return false;
+          // 1. Explicit parent in chain?
+          if (o.parentId && fullChain.some(p => p.id === o.parentId)) return false;
           
           const princ = (o.vehicles || []).find(v => v.role === 'principal');
           const pId = getVehId(princ);
-          if (pId) {
-            const isTradeInOfOther = fullChain.some(other => 
-              other.id !== o.id && (other.vehicles || []).some(v => v.role === 'parte_pago' && getVehId(v) === pId)
-            );
-            if (isTradeInOfOther) return false;
-            
-            const earlierOpWithSamePrincipal = fullChain.some(other => 
-              other.id !== o.id && 
-              parseDate(other.date) < parseDate(o.date) && 
+          
+          // 2. Was its principal vehicle a trade-in of another op in this chain?
+          // (Trade-in -> Purchase link means Purchase is not root)
+          const isTradeInOfOther = fullChain.some(other => 
+            other.id !== o.id && (other.vehicles || []).some(v => v.role === 'parte_pago' && getVehId(v) === pId)
+          );
+          if (isTradeInOfOther) return false;
+
+          // 3. Business Priority: A VENTA is NEVER a root if there's a COMPRA of the same car
+          if (o.operation_type.toLowerCase() === 'venta' && pId) {
+            const hasCompraInChain = fullChain.some(other => 
+              other.operation_type.toLowerCase() === 'compra' && 
               (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId)
             );
-            if (earlierOpWithSamePrincipal) return false;
+            if (hasCompraInChain) return false;
           }
+          
+          // 4. If multiple COMPRAs of same car, keep earliest
+          if (o.operation_type.toLowerCase() === 'compra' && pId) {
+            const earlierCompra = fullChain.some(other => 
+              other.id !== o.id && 
+              other.operation_type.toLowerCase() === 'compra' && 
+              (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId) &&
+              parseDate(other.date) < parseDate(o.date)
+            );
+            if (earlierCompra) return false;
+          }
+
           return true;
       });
 
@@ -401,6 +416,7 @@ function App() {
         if (processedIds.has(node.id)) return;
         processedIds.add(node.id);
 
+        const nodeType = node.operation_type.toLowerCase();
         const principal = node.vehicles?.find(v => v.role === 'principal');
         const pId = getVehId(principal);
         const tradeIns = node.vehicles?.filter(v => v.role === 'parte_pago') || [];
@@ -429,27 +445,24 @@ function App() {
 
         const children = fullChain.filter(o => {
             if (processedIds.has(o.id)) return false;
+            
+            // Link A: Explicit manually linked via UI
             if (o.parentId === node.id) return true;
             
-            const isTradeInChild = tradeIns.some(t => {
-                const tId = getVehId(t);
-                return tId && (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === tId);
-            });
-            if (isTradeInChild) return true;
-
-            if (pId) {
-                const isSameVehLater = (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId) && 
-                                       parseDate(o.date) >= parseDate(node.date);
-                if (isSameVehLater) {
-                    const intermediary = fullChain.some(inter => 
-                        inter.id !== node.id && inter.id !== o.id &&
-                        (inter.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId) &&
-                        parseDate(inter.date) >= parseDate(node.date) &&
-                        parseDate(inter.date) < parseDate(o.date)
-                    );
-                    if (!intermediary) return true;
-                }
+            // Link B: Compra (Same Car) -> Venta (Same Car)
+            if (nodeType === 'compra' && pId) {
+                const isVentaOfSameCar = o.operation_type.toLowerCase() === 'venta' && 
+                                         (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId);
+                if (isVentaOfSameCar) return true;
             }
+
+            // Link C: Venta (Principal) -> Compra (of a trade-in vehicle)
+            if (nodeType === 'venta') {
+                const isCompraOfTradeIn = o.operation_type.toLowerCase() === 'compra' && 
+                                          (o.vehicles || []).some(v => v.role === 'principal' && tradeIns.some(t => getVehId(t) === getVehId(v)));
+                if (isCompraOfTradeIn) return true;
+            }
+
             return false;
         });
 
