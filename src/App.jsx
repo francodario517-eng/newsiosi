@@ -327,59 +327,77 @@ function App() {
   }
 
   const exportToExcel = async () => {
-    // Determine which operations to export (only those currently filtered)
     const targetOps = filteredOperations;
     const processedIds = new Set();
     const exportData = [];
+    const getVehId = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
 
-    // Grouping logic based ONLY on filtered items, but keeping lineage context
     targetOps.forEach(op => {
       if (processedIds.has(op.id)) return;
 
-      // Find all operations in the same chain that are ALSO in the filtered set
-      // We first find the root of this operation's chain (even if root is filtered out)
-      const findRoot = (o) => {
-        if (!o.parentId) return o;
-        const parent = operations.find(p => p.id === o.parentId);
-        return parent ? findRoot(parent) : o;
-      };
-
-      const root = findRoot(op);
+      const chainOps = new Set();
+      const toCheck = [op.id];
       
-      // Get all descendants in the FULL database to calculate accurate stats
-      const getFullLineage = (parentId) => {
-        const children = operations.filter(o => o.parentId === parentId);
-        let results = [...children];
-        children.forEach(child => {
-          results = [...results, ...getFullLineage(child.id)];
+      while (toCheck.length > 0) {
+        const currentId = toCheck.pop();
+        if (chainOps.has(currentId)) continue;
+        const currentOp = operations.find(o => o.id === currentId);
+        if (!currentOp) continue;
+        
+        chainOps.add(currentId);
+        if (currentOp.parentId && !chainOps.has(currentOp.parentId)) toCheck.push(currentOp.parentId);
+        operations.filter(o => o.parentId === currentId && !chainOps.has(o.id)).forEach(o => toCheck.push(o.id));
+        
+        const principal = (currentOp.vehicles || []).find(v => v.role === 'principal');
+        const pId = getVehId(principal);
+        if (pId) {
+          operations.filter(o => !chainOps.has(o.id) && (o.vehicles || []).some(v => getVehId(v) === pId)).forEach(o => toCheck.push(o.id));
+        }
+        (currentOp.vehicles || []).filter(v => v.role === 'parte_pago').forEach(t => {
+          const tId = getVehId(t);
+          if (tId) {
+            operations.filter(o => !chainOps.has(o.id) && (o.vehicles || []).some(v => getVehId(v) === tId)).forEach(o => toCheck.push(o.id));
+          }
         });
-        return results;
-      };
+      }
+
+      const fullChain = Array.from(chainOps).map(id => operations.find(o => o.id === id));
       
-      const fullLineage = [root, ...getFullLineage(root.id)];
-      const stats = financials.getTreeStats({ 
-        nodes: fullLineage.map(o => ({ data: { ...o, total_amount: o.total_amount } })) 
+      const roots = fullChain.filter(o => {
+          const p = o.parentId ? fullChain.find(p => p.id === o.parentId) : null;
+          if (p) return false;
+          const princ = (o.vehicles || []).find(v => v.role === 'principal');
+          const pId = getVehId(princ);
+          if (pId) {
+            const hasSmartParent = fullChain.some(other => 
+              other.id !== o.id && (other.vehicles || []).some(v => v.role === 'parte_pago' && getVehId(v) === pId)
+            );
+            if (hasSmartParent) return false;
+          }
+          return true;
       });
 
-      // Export the WHOLE lineage if at least one member is in our targeted (filtered) set
-      fullLineage.forEach((lineageOp) => {
-        processedIds.add(lineageOp.id);
-        const principal = lineageOp.vehicles?.find(v => v.role === 'principal');
-        const tradeIns = lineageOp.vehicles?.filter(v => v.role === 'parte_pago') || [];
+      const pushToExport = (node, depth = 0) => {
+        if (processedIds.has(node.id)) return;
+        processedIds.add(node.id);
+
+        const principal = node.vehicles?.find(v => v.role === 'principal');
+        const tradeIns = node.vehicles?.filter(v => v.role === 'parte_pago') || [];
+        const indent = depth > 0 ? ' '.repeat(depth * 3) + '↳ ' : '';
 
         exportData.push({
-          'ID Cadena': root.id,
-          'Fecha': lineageOp.date,
-          'Operacion': lineageOp.operation_type.toUpperCase(),
-          'Comprador/Vendedor': lineageOp.buyer,
-          'Vehículo': principal?.description || 'N/A',
-          'Principal': lineageOp.total_amount,
+          'ID Cadena': roots[0]?.id.substring(0, 13) || node.id.substring(0, 13),
+          'Fecha': node.date,
+          'Operacion': node.operation_type.toUpperCase(),
+          'Comprador/Vendedor': node.buyer,
+          'Vehículo': indent + (principal?.description || 'N/A'),
+          'Principal': node.total_amount,
           'Chapa': principal?.chapa || 'N/A',
           'Chasis': principal?.chasis || 'N/A',
           'Parte de Pago': tradeIns.reduce((sum, v) => sum + (v.valuation || 0), 0),
           'Vehículos en Parte de Pago': tradeIns.map(v => `${v.description} (CHAPA: ${v.chapa || 'S/C'})`).join(' | '),
-          'su valor': lineageOp.total_amount,
-          'Costo Inversión (Origen)': root.total_amount,
+          'su valor': node.total_amount,
+          'Costo Inversión (Origen)': roots[0]?.total_amount || 0,
           'clasipar': '',
           'Marketplace': '',
           'Instagram': '',
@@ -387,10 +405,30 @@ function App() {
           '# Comparativa del Precio Prom vs Precio USD': '',
           '% Comparativa del Prom vs Precio USD': ''
         });
-      });
 
-      // Add a spacer row between chains
-      if (fullLineage.length > 0) exportData.push({});
+        const children = fullChain.filter(o => o.parentId === node.id);
+        tradeIns.forEach(t => {
+          const tId = getVehId(t);
+          if (tId) {
+            fullChain.filter(o => !processedIds.has(o.id) && (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === tId))
+              .forEach(c => children.push(c));
+          }
+        });
+
+        children.sort((a, b) => {
+            const parseDate = (d) => {
+                if (!d) return new Date(0);
+                const [day, month, year] = d.split('/').map(Number);
+                return new Date(year, month - 1, day);
+            };
+            return parseDate(a.date) - parseDate(b.date);
+        });
+
+        children.forEach(c => pushToExport(c, depth + 1));
+      };
+
+      roots.forEach(r => pushToExport(r, 0));
+      if (fullChain.length > 0) exportData.push({});
     });
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
