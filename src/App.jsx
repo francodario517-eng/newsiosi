@@ -635,7 +635,7 @@ function App() {
       {/* Main Content */}
       <main className="main-content">
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-          <div className="animate-in" style={{ flex: '1 1 300px' }}>
+          <div className="animate-in" style={{ flex: 'none', width: '100%', marginBottom: '4px' }}>
             <h1 className="h1-responsive">{activeTab === 'operations' ? 'Operaciones' : activeTab === 'stock' ? 'Inventario' : activeTab === 'tree' ? 'Trazabilidad' : 'Analítica'}</h1>
             <h2 style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>{activeTab === 'operations' ? 'Gestión de transacciones' : activeTab === 'stock' ? 'Vehículos en stock' : activeTab === 'tree' ? 'Cadena de valor' : 'KPIs Financieros'}</h2>
           </div>
