@@ -364,5 +364,45 @@ export const db = {
     if (error) throw error;
     db.notify();
     return true;
+  },
+
+  getProfile: async (userId) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching profile:', error);
+      return null;
+    }
+    return data;
+  },
+
+  getAllProfiles: async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('email');
+    
+    if (error) {
+      console.error('Error fetching profiles:', error);
+      return [];
+    }
+    return data;
+  },
+
+  updateProfile: async (userId, updates) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    db.notify();
+    return data;
   }
 };

@@ -72,38 +72,42 @@ export function OperationsTable({ operations, onSelectOperation, onDeleteOperati
                         <Eye size={14} />
                         Árbol
                       </button>
-                      <button 
-                        className="btn btn-outline" 
-                        style={{ 
-                          padding: '8px', 
-                          height: '36px',
-                          width: '36px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--primary)', 
-                          borderColor: 'rgba(170, 59, 255, 0.2)'
-                        }}
-                        onClick={() => onEditOperation(op)}
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button 
-                        className="btn btn-outline" 
-                        style={{ 
-                          padding: '8px', 
-                          height: '36px',
-                          width: '36px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#ef4444', 
-                          borderColor: 'rgba(239, 68, 68, 0.2)'
-                        }}
-                        onClick={() => onDeleteOperation(op)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {onEditOperation && (
+                        <button 
+                          className="btn btn-outline" 
+                          style={{ 
+                            padding: '8px', 
+                            height: '36px',
+                            width: '36px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--primary)', 
+                            borderColor: 'rgba(170, 59, 255, 0.2)'
+                          }}
+                          onClick={() => onEditOperation(op)}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      )}
+                      {onDeleteOperation && (
+                        <button 
+                          className="btn btn-outline" 
+                          style={{ 
+                            padding: '8px', 
+                            height: '36px',
+                            width: '36px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ef4444', 
+                            borderColor: 'rgba(239, 68, 68, 0.2)'
+                          }}
+                          onClick={() => onDeleteOperation(op)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

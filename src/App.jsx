@@ -14,8 +14,9 @@ import {
   TrendingUp,
   Package,
   Calendar as CalendarIcon,
-  Menu,
-  LogOut
+  LogOut,
+  Users,
+  Shield
 } from 'lucide-react'
 import './index.css'
 import { db } from './services/db'
@@ -24,6 +25,7 @@ import { OperationsTable } from './components/OperationsTable'
 import { TreeView } from './components/TreeView'
 import { StatsDashboard } from './components/StatsDashboard'
 import { Auth } from './components/Auth'
+import { UserManagement } from './components/UserManagement'
 import { supabase } from './services/db'
 import * as XLSX from 'xlsx'
 import { StockTable } from './components/StockTable'
@@ -41,6 +43,7 @@ function App() {
   const [highlightedId, setHighlightedId] = useState(() => localStorage.getItem('highlightedId') || null)
   const [isTreeLoading, setIsTreeLoading] = useState(false)
   const [session, setSession] = useState(null)
+  const [userProfile, setUserProfile] = useState(null)
   const [editingOperation, setEditingOperation] = useState(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   
@@ -125,10 +128,18 @@ function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session?.user) {
+        db.getProfile(session.user.id).then(profile => setUserProfile(profile));
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session?.user) {
+        db.getProfile(session.user.id).then(profile => setUserProfile(profile));
+      } else {
+        setUserProfile(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -619,6 +630,11 @@ function App() {
           <button className={`btn ${activeTab === 'stats' ? 'btn-primary' : ''}`} onClick={() => { setActiveTab('stats'); setIsMenuOpen(false); }}>
             <BarChart3 size={20} /> Analítica
           </button>
+          {userProfile?.is_admin && (
+            <button className={`btn ${activeTab === 'users' ? 'btn-primary' : ''}`} onClick={() => { setActiveTab('users'); setIsMenuOpen(false); }}>
+              <Users size={20} /> Usuarios
+            </button>
+          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -771,8 +787,8 @@ function App() {
               <OperationsTable 
                 operations={filteredOperations} 
                 onSelectOperation={handleSelectOperation} 
-                onDeleteOperation={handleDeleteOperation}
-                onEditOperation={handleEditOperation}
+                onDeleteOperation={userProfile?.can_delete ? handleDeleteOperation : null}
+                onEditOperation={userProfile?.can_edit ? handleEditOperation : null}
               />
             </div>
           )}
@@ -780,7 +796,7 @@ function App() {
             <div className="card glass">
               <StockTable 
                 stock={stockVehicles} 
-                onSellVehicle={handleOpenBranchModal} 
+                onSellVehicle={userProfile?.can_edit ? handleOpenBranchModal : null} 
               />
             </div>
           )}
@@ -808,9 +824,9 @@ function App() {
                ) : (
                  <TreeView 
                    data={selectedTraceability} 
-                   onAddBranch={handleOpenBranchModal} 
-                   onEditOperation={handleEditOperation}
-                   onDeleteOperation={handleDeleteOperation}
+                   onAddBranch={userProfile?.can_edit ? handleOpenBranchModal : null} 
+                   onEditOperation={userProfile?.can_edit ? handleEditOperation : null}
+                   onDeleteOperation={userProfile?.can_delete ? handleDeleteOperation : null}
                    highlightedId={highlightedId}
                    isLoading={isTreeLoading}
                  />
@@ -822,6 +838,10 @@ function App() {
               metrics={financials.getGlobalMetrics(operations, filteredOperations)} 
               stock={stockVehicles}
             />
+          )}
+
+          {activeTab === 'users' && userProfile?.is_admin && (
+            <UserManagement />
           )}
         </section>
       </main>
