@@ -584,13 +584,13 @@ function App() {
     <div className="app-container">
       {/* Mobile Header */}
       <div className="mobile-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Car size={24} color="var(--primary)" />
-          <span style={{ fontWeight: 'bold', fontSize: '18px' }}>MH</span>
-        </div>
-        <button onClick={() => setIsMenuOpen(!isMenuOpen)} style={{ background: 'none', border: 'none', color: 'white' }}>
-          {isMenuOpen ? <X size={24} /> : <Menu size={24} />} 
+        <button onClick={() => setIsMenuOpen(!isMenuOpen)} style={{ background: 'none', border: 'none', color: 'white', display: 'flex', alignItems: 'center', padding: '8px' }}>
+          {isMenuOpen ? <X size={26} /> : <Menu size={26} />} 
         </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontWeight: 'bold', fontSize: '18px', color: 'var(--text-main)' }}>MH</span>
+          <Car size={22} color="var(--primary)" />
+        </div>
       </div>
 
       {/* Menu Overlay */}
