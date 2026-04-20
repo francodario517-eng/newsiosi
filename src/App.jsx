@@ -14,7 +14,8 @@ import {
   TrendingUp,
   Package,
   Calendar as CalendarIcon,
-  Menu
+  Menu,
+  LogOut
 } from 'lucide-react'
 import './index.css'
 import { db } from './services/db'
@@ -598,22 +599,35 @@ function App() {
       {/* Sidebar */}
       <aside className={`sidebar ${isMenuOpen ? 'open' : ''}`}>
         <div className="logo-section">
-          <Car size={32} color="var(--primary)" />
-          <h2 style={{ color: 'white', marginTop: '12px', letterSpacing: '1px' }}>MH</h2>
-        </div>
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <button className={`btn ${activeTab === 'operations' ? 'btn-primary' : 'btn-outline'}`} onClick={() => { setActiveTab('operations'); setSelectedTraceability(null); }} style={{ width: '100%', justifyContent: 'flex-start' }}><ArrowLeftRight size={20} /> Operaciones</button>
-          <button className={`btn ${activeTab === 'stock' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('stock')} style={{ width: '100%', justifyContent: 'flex-start' }}><Package size={20} /> Stock</button>
-          <button className={`btn ${activeTab === 'tree' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('tree')} style={{ width: '100%', justifyContent: 'flex-start' }}><GitBranch size={20} /> Trazabilidad</button>
-          <button className={`btn ${activeTab === 'stats' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveTab('stats')} style={{ width: '100%', justifyContent: 'flex-start' }}><BarChart3 size={20} /> Estadísticas</button>
-        </nav>
-        <div className="sidebar-footer">
-          <div className="card glass" style={{ padding: '12px', fontSize: '12px', marginBottom: '16px' }}>
-            <div style={{ color: 'var(--text-muted)' }}>Usuario</div>
-            <div style={{ color: 'var(--primary)', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis' }}>{session?.user?.email}</div>
+          <div style={{ background: 'rgba(170, 59, 255, 0.1)', padding: '16px', borderRadius: '16px', marginBottom: '8px' }}>
+            <Car size={32} color="var(--primary)" />
           </div>
-          <button className="btn btn-outline" style={{ width: '100%', justifyContent: 'flex-start' }} onClick={() => supabase.auth.signOut()}>
-            <X size={20} /> Salir del Sistema
+          <h2>MH</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '12px', letterSpacing: '2px' }}>MOTOR HAUS</p>
+        </div>
+
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <button className={`btn ${activeTab === 'operations' ? 'btn-primary' : ''}`} onClick={() => { setActiveTab('operations'); setSelectedTraceability(null); setIsMenuOpen(false); }}>
+            <ArrowLeftRight size={20} /> Operaciones
+          </button>
+          <button className={`btn ${activeTab === 'stock' ? 'btn-primary' : ''}`} onClick={() => { setActiveTab('stock'); setIsMenuOpen(false); }}>
+            <Package size={20} /> Inventario
+          </button>
+          <button className={`btn ${activeTab === 'tree' ? 'btn-primary' : ''}`} onClick={() => { setActiveTab('tree'); setIsMenuOpen(false); }}>
+            <GitBranch size={20} /> Trazabilidad
+          </button>
+          <button className={`btn ${activeTab === 'stats' ? 'btn-primary' : ''}`} onClick={() => { setActiveTab('stats'); setIsMenuOpen(false); }}>
+            <BarChart3 size={20} /> Analítica
+          </button>
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="glass" style={{ padding: '16px', borderRadius: '14px', marginBottom: '16px', background: 'rgba(255,255,255,0.02)' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px' }}>Sesión activa</div>
+            <div style={{ color: 'white', fontWeight: 'bold', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{session?.user?.email}</div>
+          </div>
+          <button className="btn btn-outline" style={{ width: '100%', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }} onClick={() => supabase.auth.signOut()}>
+            <LogOut size={20} /> Cerrar Sesión
           </button>
         </div>
       </aside>

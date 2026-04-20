@@ -227,17 +227,61 @@ input[type=number] {
 
   .sidebar {
     position: fixed;
-    left: -260px;
+    left: -280px;
     top: 0;
-    width: 260px;
+    width: 280px;
     height: 100vh;
-    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #0f1016;
+    border-right: 1px solid var(--border);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 20px 0 50px rgba(0,0,0,0.5);
-    z-index: 1001;
+    z-index: 2000;
+    padding: 32px 20px;
+    display: flex;
+    flex-direction: column;
   }
 
   .sidebar.open {
-    left: 0;
+    transform: translateX(280px);
+  }
+
+  .sidebar .btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: #94a3b8;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .sidebar .btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: white;
+  }
+
+  .sidebar .btn.btn-primary {
+    background: var(--primary-gradient);
+    color: white;
+    border: none;
+  }
+
+  .logo-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo-section h2 {
+    font-size: 24px;
+    font-weight: 800;
+    margin-top: 12px;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
   .main-content {
@@ -258,8 +302,8 @@ input[type=number] {
     padding: 0 16px;
     align-items: center;
     justify-content: space-between;
-    background: rgba(15, 16, 22, 0.95);
-    backdrop-filter: blur(10px);
+    background: rgba(9, 10, 15, 0.8);
+    backdrop-filter: blur(12px) saturate(160%);
     border-bottom: 1px solid var(--border);
     z-index: 1000;
   }

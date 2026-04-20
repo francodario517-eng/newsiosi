@@ -229,6 +229,7 @@ export function TreeView({ data, onAddBranch, onEditOperation, onDeleteOperation
           nodeTypes={nodeTypes}
           fitView
           style={{ background: 'transparent' }}
+          proOptions={{ hideAttribution: true }}
         >
           <Background color="#333" gap={20} variant="dots" />
           <Controls />
