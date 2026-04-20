@@ -233,10 +233,6 @@ export function TreeView({ data, onAddBranch, onEditOperation, onDeleteOperation
         >
           <Background color="#333" gap={20} variant="dots" />
           <Controls />
-          <MiniMap 
-            nodeColor={(n) => n.data.operation_type === 'venta' ? '#ef4444' : '#10b981'}
-            maskColor="rgba(0,0,0,0.5)"
-          />
         </ReactFlow>
       )}
     </div>
