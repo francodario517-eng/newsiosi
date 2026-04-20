@@ -160,17 +160,24 @@ function App() {
     else localStorage.removeItem('highlightedId');
   }, [activeTab, searchQuery, period, highlightedId]);
 
-  // Restore traceability if there was a highlighted vehicle
+  // Restore/Refresh traceability if there was a highlighted vehicle or operations change
   useEffect(() => {
-    if (activeTab === 'tree' && highlightedId && operations.length > 0 && !selectedTraceability && !isTreeLoading) {
-      // Find a vehicle from any operation that matches the highlightedId (which we use as vehicle identifier)
-      // Actually, handleSelectOperation expects the operation object.
-      const op = operations.find(o => o.id === highlightedId || o.vehicles.some(v => v.chasis === highlightedId || v.chapa === highlightedId));
-      if (op) {
-        handleSelectOperation(op);
+    const refreshTree = async () => {
+      if (activeTab === 'tree' && highlightedId && operations.length > 0) {
+        // Find a vehicle from any operation that matches the highlightedId
+        const op = operations.find(o => o.id === highlightedId || o.vehicles.some(v => v.chasis === highlightedId || v.chapa === highlightedId));
+        if (op) {
+          const vehicleId = op.vehicles[0]?.chasis || op.vehicles[0]?.chapa || op.vehicles[0]?.id;
+          if (vehicleId) {
+            const trace = await db.getVehicleTraceability(vehicleId, operations);
+            setSelectedTraceability(trace);
+            setStats(financials.getTreeStats(trace));
+          }
+        }
       }
-    }
-  }, [operations, activeTab]);
+    };
+    refreshTree();
+  }, [operations, activeTab, highlightedId]);
 
   const handleSelectOperation = async (op) => {
     const vehicleId = op.vehicles[0]?.chasis || op.vehicles[0]?.chapa || op.vehicles[0]?.id || op.vehicles[0]?.identifier;
@@ -180,7 +187,7 @@ function App() {
       setIsTreeLoading(true);
       
       try {
-        const trace = await db.getVehicleTraceability(vehicleId);
+        const trace = await db.getVehicleTraceability(vehicleId, operations);
         setSelectedTraceability(trace);
         setStats(financials.getTreeStats(trace));
       } catch (err) {

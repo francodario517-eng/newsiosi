@@ -12,6 +12,20 @@ export const supabase = createClient(supabaseUrl || 'https://placeholder.supabas
 
 const listeners = new Set();
 
+// Supabase Realtime Subscription
+// Note: Ensure Realtime is enabled for these tables in the Supabase Dashboard
+supabase
+  .channel('realtime_changes')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'operations' }, (payload) => {
+    console.log('Realtime change in operations:', payload);
+    db.notify();
+  })
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles' }, (payload) => {
+    console.log('Realtime change in vehicles:', payload);
+    db.notify();
+  })
+  .subscribe();
+
 export const db = {
   subscribe: (callback) => {
     listeners.add(callback);
@@ -138,8 +152,8 @@ export const db = {
     return { ...opData, parentId: opData.parent_id };
   },
 
-  getVehicleTraceability: async (vehicleId) => {
-    const allOps = await db.getOperations();
+  getVehicleTraceability: async (vehicleId, allOps = null) => {
+    if (!allOps) allOps = await db.getOperations();
     if (!allOps || allOps.length === 0) return { nodes: [], edges: [] };
 
     const getVehId = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
