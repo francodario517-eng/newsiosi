@@ -707,37 +707,37 @@ function App() {
 
         {activeTab === 'tree' && (selectedTraceability || isTreeLoading) && (
           <div className="animate-in metrics-grid" style={{ marginBottom: '32px' }}>
-            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '10px', borderRadius: '12px', display: 'flex', flexShrink: 0 }}>
-                <Package color="#3b82f6" size={20} />
+            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '8px', borderRadius: '10px', display: 'flex', flexShrink: 0 }}>
+                <Package color="#3b82f6" size={18} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ color: 'var(--text-muted)', fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Inversión Inicial</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '11px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Inversión Inicial</div>
                 {isTreeLoading ? (
-                  <div className="skeleton" style={{ height: '24px', width: '80%', marginTop: '4px' }}></div>
+                  <div className="skeleton" style={{ height: '20px', width: '80%', marginTop: '4px' }}></div>
                 ) : (
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#3b82f6' }}>USD {stats.totalInvestment.toLocaleString()}</div>
+                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#3b82f6' }}>USD {stats.totalInvestment.toLocaleString()}</div>
                 )}
               </div>
             </div>
 
-            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ background: stats.totalProfit > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '12px', display: 'flex', flexShrink: 0 }}>
-                <TrendingUp color={stats.totalProfit > 0 ? '#10b981' : '#ef4444'} size={20} />
+            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ background: stats.totalProfit > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', padding: '8px', borderRadius: '10px', display: 'flex', flexShrink: 0 }}>
+                <TrendingUp color={stats.totalProfit > 0 ? '#10b981' : '#ef4444'} size={18} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ color: 'var(--text-muted)', fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Ganancia Est.</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '11px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Ganancia Est.</div>
                 {isTreeLoading ? (
-                  <div className="skeleton" style={{ height: '24px', width: '80%', marginTop: '4px' }}></div>
+                  <div className="skeleton" style={{ height: '20px', width: '80%', marginTop: '4px' }}></div>
                 ) : (
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: stats.totalProfit > 0 ? '#10b981' : '#ef4444' }}>USD {stats.totalProfit.toLocaleString()}</div>
+                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: stats.totalProfit > 0 ? '#10b981' : '#ef4444' }}>USD {stats.totalProfit.toLocaleString()}</div>
                 )}
               </div>
             </div>
             
-            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ background: 'rgba(170, 59, 255, 0.1)', padding: '10px', borderRadius: '12px', display: 'flex', flexShrink: 0 }}>
-                <Package color="var(--primary)" size={20} />
+            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ background: 'rgba(170, 59, 255, 0.1)', padding: '8px', borderRadius: '10px', display: 'flex', flexShrink: 0 }}>
+                <Package color="var(--primary)" size={18} />
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ color: 'var(--text-muted)', fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Vehículos Árbol</div>
