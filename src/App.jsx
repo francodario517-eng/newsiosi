@@ -334,166 +334,171 @@ function App() {
   }
 
   const exportToExcel = async () => {
-    const targetOps = filteredOperations;
-    const processedIds = new Set();
-    const exportData = [];
-    const getVehId = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
-    const parseDateHelper = (d) => {
-      if (!d) return new Date(0);
-      const parts = d.toString().split(/[-/]/).map(Number);
-      if (parts.length === 3) {
-        // YYYY-MM-DD
-        if (parts[0] > 1000) return new Date(parts[0], parts[1] - 1, parts[2]);
-        // DD-MM-YYYY
-        return new Date(parts[2], parts[1] - 1, parts[0]);
-      }
-      const parsed = new Date(d);
-      return isNaN(parsed.getTime()) ? new Date(0) : parsed;
-    };
-
-    targetOps.forEach(op => {
-      if (processedIds.has(op.id)) return;
-
-      const chainOps = new Set();
-      const toCheck = [op.id];
-      
-      while (toCheck.length > 0) {
-        const currentId = toCheck.pop();
-        if (chainOps.has(currentId)) continue;
-        const currentOp = operations.find(o => o.id === currentId);
-        if (!currentOp) continue;
-        
-        chainOps.add(currentId);
-        if (currentOp.parentId && !chainOps.has(currentOp.parentId)) toCheck.push(currentOp.parentId);
-        operations.filter(o => o.parentId === currentId && !chainOps.has(o.id)).forEach(o => toCheck.push(o.id));
-        
-        const principal = (currentOp.vehicles || []).find(v => v.role === 'principal');
-        const pId = getVehId(principal);
-        if (pId) {
-          operations.filter(o => !chainOps.has(o.id) && (o.vehicles || []).some(v => getVehId(v) === pId)).forEach(o => toCheck.push(o.id));
+    try {
+      const targetOps = filteredOperations;
+      const processedIds = new Set();
+      const exportData = [];
+      const getVehId = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
+      const parseDate = (d) => {
+        if (!d) return new Date(0);
+        const parts = d.toString().split(/[-/]/).map(Number);
+        if (parts.length === 3) {
+          // YYYY-MM-DD
+          if (parts[0] > 1000) return new Date(parts[0], parts[1] - 1, parts[2]);
+          // DD-MM-YYYY
+          return new Date(parts[2], parts[1] - 1, parts[0]);
         }
-        (currentOp.vehicles || []).filter(v => v.role === 'parte_pago').forEach(t => {
-          const tId = getVehId(t);
-          if (tId) {
-            operations.filter(o => !chainOps.has(o.id) && (o.vehicles || []).some(v => getVehId(v) === tId)).forEach(o => toCheck.push(o.id));
-          }
-        });
-      }
-
-      const fullChain = Array.from(chainOps).map(id => operations.find(o => o.id === id));
-      
-      const roots = fullChain.filter(o => {
-          // 1. Explicit parent in chain?
-          if (o.parentId && fullChain.some(p => p.id === o.parentId)) return false;
-          
-          const princ = (o.vehicles || []).find(v => v.role === 'principal');
-          const pId = getVehId(princ);
-          
-          // 2. Was its principal vehicle a trade-in of another op in this chain?
-          // (Trade-in -> Purchase link means Purchase is not root)
-          const isTradeInOfOther = fullChain.some(other => 
-            other.id !== o.id && (other.vehicles || []).some(v => v.role === 'parte_pago' && getVehId(v) === pId)
-          );
-          if (isTradeInOfOther) return false;
-
-          // 3. Business Priority: A VENTA is NEVER a root if there's a COMPRA of the same car
-          if (o.operation_type.toLowerCase() === 'venta' && pId) {
-            const hasCompraInChain = fullChain.some(other => 
-              other.operation_type.toLowerCase() === 'compra' && 
-              (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId)
-            );
-            if (hasCompraInChain) return false;
-          }
-          
-          // 4. If multiple COMPRAs of same car, keep earliest
-          if (o.operation_type.toLowerCase() === 'compra' && pId) {
-            const earlierCompra = fullChain.some(other => 
-              other.id !== o.id && 
-              other.operation_type.toLowerCase() === 'compra' && 
-              (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId) &&
-              parseDate(other.date) < parseDate(o.date)
-            );
-            if (earlierCompra) return false;
-          }
-
-          return true;
-      });
-
-      roots.sort((a, b) => parseDate(a.date) - parseDate(b.date));
-
-      const pushToExport = (node, depth = 0) => {
-        if (processedIds.has(node.id)) return;
-        processedIds.add(node.id);
-
-        const nodeType = node.operation_type.toLowerCase();
-        const principal = node.vehicles?.find(v => v.role === 'principal');
-        const pId = getVehId(principal);
-        const tradeIns = node.vehicles?.filter(v => v.role === 'parte_pago') || [];
-        const indent = depth > 0 ? ' '.repeat(depth * 3) + '↳ ' : '';
-
-        exportData.push({
-          'ID Cadena': roots[0]?.id.substring(0, 13) || node.id.substring(0, 13),
-          'Fecha': node.date,
-          'Operacion': node.operation_type.toUpperCase(),
-          'Comprador/Vendedor': node.buyer,
-          'Vehículo': indent + (principal?.description || 'N/A'),
-          'Principal': node.total_amount,
-          'Chapa': principal?.chapa || 'N/A',
-          'Chasis': principal?.chasis || 'N/A',
-          'Parte de Pago': tradeIns.reduce((sum, v) => sum + (v.valuation || 0), 0),
-          'Vehículos en Parte de Pago': tradeIns.map(v => `${v.description} (CHAPA: ${v.chapa || 'S/C'})`).join(' | '),
-          'su valor': node.total_amount,
-          'Costo Inversión (Origen)': roots[0]?.total_amount || 0,
-          'clasipar': '',
-          'Marketplace': '',
-          'Instagram': '',
-          'Precio Promedio del mercado': '',
-          '# Comparativa del Precio Prom vs Precio USD': '',
-          '% Comparativa del Prom vs Precio USD': ''
-        });
-
-        const children = fullChain.filter(o => {
-            if (processedIds.has(o.id)) return false;
-            
-            // Link A: Explicit manually linked via UI
-            if (o.parentId === node.id) return true;
-            
-            // Link B: Compra (Same Car) -> Venta (Same Car)
-            if (nodeType === 'compra' && pId) {
-                const isVentaOfSameCar = o.operation_type.toLowerCase() === 'venta' && 
-                                         (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId);
-                if (isVentaOfSameCar) return true;
-            }
-
-            // Link C: Venta (Principal) -> Compra (of a trade-in vehicle)
-            if (nodeType === 'venta') {
-                const isCompraOfTradeIn = o.operation_type.toLowerCase() === 'compra' && 
-                                          (o.vehicles || []).some(v => v.role === 'principal' && tradeIns.some(t => getVehId(t) === getVehId(v)));
-                if (isCompraOfTradeIn) return true;
-            }
-
-            return false;
-        });
-
-        children.sort((a, b) => parseDate(a.date) - parseDate(b.date));
-        children.forEach(c => pushToExport(c, depth + 1));
+        const parsed = new Date(d);
+        return isNaN(parsed.getTime()) ? new Date(0) : parsed;
       };
 
-      roots.forEach(r => pushToExport(r, 0));
-      if (fullChain.length > 0) exportData.push({});
-    });
+      targetOps.forEach(op => {
+        if (processedIds.has(op.id)) return;
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte Filtrado");
-    
-    const wscols = [
-      {wch: 12}, {wch: 12}, {wch: 15}, {wch: 30}, {wch: 30}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 40}, {wch: 15}, {wch: 22}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 25}, {wch: 25}
-    ];
-    worksheet['!cols'] = wscols;
+        const chainOps = new Set();
+        const toCheck = [op.id];
+        
+        while (toCheck.length > 0) {
+          const currentId = toCheck.pop();
+          if (chainOps.has(currentId)) continue;
+          const currentOp = operations.find(o => o.id === currentId);
+          if (!currentOp) continue;
+          
+          chainOps.add(currentId);
+          if (currentOp.parentId && !chainOps.has(currentOp.parentId)) toCheck.push(currentOp.parentId);
+          operations.filter(o => o.parentId === currentId && !chainOps.has(o.id)).forEach(o => toCheck.push(o.id));
+          
+          const principal = (currentOp.vehicles || []).find(v => v.role === 'principal');
+          const pId = getVehId(principal);
+          if (pId) {
+            operations.filter(o => !chainOps.has(o.id) && (o.vehicles || []).some(v => getVehId(v) === pId)).forEach(o => toCheck.push(o.id));
+          }
+          (currentOp.vehicles || []).filter(v => v.role === 'parte_pago').forEach(t => {
+            const tId = getVehId(t);
+            if (tId) {
+              operations.filter(o => !chainOps.has(o.id) && (o.vehicles || []).some(v => getVehId(v) === tId)).forEach(o => toCheck.push(o.id));
+            }
+          });
+        }
 
-    const fileName = searchQuery ? `Reporte_${searchQuery}_${period}.xlsx` : `Reporte_Filtrado_${period}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+        const fullChain = Array.from(chainOps).map(id => operations.find(o => o.id === id));
+        
+        const roots = fullChain.filter(o => {
+            // 1. Explicit parent in chain?
+            if (o.parentId && fullChain.some(p => p.id === o.parentId)) return false;
+            
+            const princ = (o.vehicles || []).find(v => v.role === 'principal');
+            const pId = getVehId(princ);
+            
+            // 2. Was its principal vehicle a trade-in of another op in this chain?
+            // (Trade-in -> Purchase link means Purchase is not root)
+            const isTradeInOfOther = fullChain.some(other => 
+              other.id !== o.id && (other.vehicles || []).some(v => v.role === 'parte_pago' && getVehId(v) === pId)
+            );
+            if (isTradeInOfOther) return false;
+
+            // 3. Business Priority: A VENTA is NEVER a root if there's a COMPRA of the same car
+            if (o.operation_type.toLowerCase() === 'venta' && pId) {
+              const hasCompraInChain = fullChain.some(other => 
+                other.operation_type.toLowerCase() === 'compra' && 
+                (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId)
+              );
+              if (hasCompraInChain) return false;
+            }
+            
+            // 4. If multiple COMPRAs of same car, keep earliest
+            if (o.operation_type.toLowerCase() === 'compra' && pId) {
+              const earlierCompra = fullChain.some(other => 
+                other.id !== o.id && 
+                other.operation_type.toLowerCase() === 'compra' && 
+                (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId) &&
+                parseDate(other.date) < parseDate(o.date)
+              );
+              if (earlierCompra) return false;
+            }
+
+            return true;
+        });
+
+        roots.sort((a, b) => parseDate(a.date) - parseDate(b.date));
+
+        const pushToExport = (node, depth = 0) => {
+          if (processedIds.has(node.id)) return;
+          processedIds.add(node.id);
+
+          const nodeType = node.operation_type.toLowerCase();
+          const principal = node.vehicles?.find(v => v.role === 'principal');
+          const pId = getVehId(principal);
+          const tradeIns = node.vehicles?.filter(v => v.role === 'parte_pago') || [];
+          const indent = depth > 0 ? ' '.repeat(depth * 3) + '↳ ' : '';
+
+          exportData.push({
+            'ID Cadena': roots[0]?.id.substring(0, 13) || node.id.substring(0, 13),
+            'Fecha': node.date,
+            'Operacion': node.operation_type.toUpperCase(),
+            'Comprador/Vendedor': node.buyer,
+            'Vehículo': indent + (principal?.description || 'N/A'),
+            'Principal': node.total_amount,
+            'Chapa': principal?.chapa || 'N/A',
+            'Chasis': principal?.chasis || 'N/A',
+            'Parte de Pago': tradeIns.reduce((sum, v) => sum + (v.valuation || 0), 0),
+            'Vehículos en Parte de Pago': tradeIns.map(v => `${v.description} (CHAPA: ${v.chapa || 'S/C'})`).join(' | '),
+            'su valor': node.total_amount,
+            'Costo Inversión (Origen)': roots[0]?.total_amount || 0,
+            'clasipar': '',
+            'Marketplace': '',
+            'Instagram': '',
+            'Precio Promedio del mercado': '',
+            '# Comparativa del Precio Prom vs Precio USD': '',
+            '% Comparativa del Prom vs Precio USD': ''
+          });
+
+          const children = fullChain.filter(o => {
+              if (processedIds.has(o.id)) return false;
+              
+              // Link A: Explicit manually linked via UI
+              if (o.parentId === node.id) return true;
+              
+              // Link B: Compra (Same Car) -> Venta (Same Car)
+              if (nodeType === 'compra' && pId) {
+                  const isVentaOfSameCar = o.operation_type.toLowerCase() === 'venta' && 
+                                           (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId);
+                  if (isVentaOfSameCar) return true;
+              }
+
+              // Link C: Venta (Principal) -> Compra (of a trade-in vehicle)
+              if (nodeType === 'venta') {
+                  const isCompraOfTradeIn = o.operation_type.toLowerCase() === 'compra' && 
+                                            (o.vehicles || []).some(v => v.role === 'principal' && tradeIns.some(t => getVehId(t) === getVehId(v)));
+                  if (isCompraOfTradeIn) return true;
+              }
+
+              return false;
+          });
+
+          children.sort((a, b) => parseDate(a.date) - parseDate(b.date));
+          children.forEach(c => pushToExport(c, depth + 1));
+        };
+
+        roots.forEach(r => pushToExport(r, 0));
+        if (fullChain.length > 0) exportData.push({});
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte Filtrado");
+      
+      const wscols = [
+        {wch: 12}, {wch: 12}, {wch: 15}, {wch: 30}, {wch: 30}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 40}, {wch: 15}, {wch: 22}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 25}, {wch: 25}
+      ];
+      worksheet['!cols'] = wscols;
+
+      const fileName = searchQuery ? `Reporte_${searchQuery}_${period}.xlsx` : `Reporte_Filtrado_${period}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    } catch (error) {
+      console.error("Error al exportar Excel:", error);
+      alert("Hubo un error al generar el archivo Excel. Por favor, revisa la consola para más detalles.");
+    }
   }
 
   const isDateInRange = (dateStr) => {
