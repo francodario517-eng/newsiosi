@@ -620,20 +620,20 @@ function App() {
 
       {/* Main Content */}
       <main className="main-content">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '48px' }}>
-          <div className="animate-in">
-            <h1>{activeTab === 'operations' ? 'Operaciones' : activeTab === 'stock' ? 'Inventario' : activeTab === 'tree' ? 'Trazabilidad' : 'Analítica'}</h1>
-            <h2 style={{ color: 'var(--text-muted)' }}>{activeTab === 'operations' ? 'Gestión de transacciones' : activeTab === 'stock' ? 'Vehículos disponibles para venta' : activeTab === 'tree' ? 'Cadena de valor comercial' : 'KPIs Financieros Globales'}</h2>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '40px', flexWrap: 'wrap', gap: '20px' }}>
+          <div className="animate-in" style={{ flex: '1 1 300px' }}>
+            <h1 className="h1-responsive">{activeTab === 'operations' ? 'Operaciones' : activeTab === 'stock' ? 'Inventario' : activeTab === 'tree' ? 'Trazabilidad' : 'Analítica'}</h1>
+            <h2 style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>{activeTab === 'operations' ? 'Gestión de transacciones' : activeTab === 'stock' ? 'Vehículos en stock' : activeTab === 'tree' ? 'Cadena de valor' : 'KPIs Financieros'}</h2>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '0 16px', gap: '8px', height: '44px' }}>
-              <Search size={18} color="var(--text-muted)" />
-              <input type="text" placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ background: 'none', border: 'none', marginBottom: 0, paddingLeft: 0, width: '140px' }} />
+          <div className="tools-bar" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', flex: '1 1 auto' }}>
+            <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '0 12px', gap: '8px', height: '40px', flex: '1 1 180px' }}>
+              <Search size={16} color="var(--text-muted)" />
+              <input type="text" placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ background: 'none', border: 'none', marginBottom: 0, paddingLeft: 0, width: '100%', fontSize: '14px' }} />
             </div>
-            <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '0 12px', gap: '8px', height: '44px' }}>
-              <Filter size={18} color="var(--text-muted)" />
-              <select value={period} onChange={(e) => setPeriod(e.target.value)} style={{ background: 'none', border: 'none', color: 'white', outline: 'none', cursor: 'pointer', fontSize: '13px', width: '160px', appearance: 'none', paddingRight: '20px' }}>
+            <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '0 10px', gap: '6px', height: '40px', flex: '1 1 140px' }}>
+              <Filter size={16} color="var(--text-muted)" />
+              <select value={period} onChange={(e) => setPeriod(e.target.value)} style={{ background: 'none', border: 'none', color: 'white', outline: 'none', cursor: 'pointer', fontSize: '13px', width: '100%', appearance: 'none' }}>
                 <option value="all" style={{ background: '#1a1b23' }}>Todo el tiempo</option>
                 <option value="today" style={{ background: '#1a1b23' }}>Hoy</option>
                 <option value="week" style={{ background: '#1a1b23' }}>Esta Semana</option>
@@ -663,8 +663,8 @@ function App() {
                 />
               </div>
             )}
-            <button className="btn btn-outline" onClick={exportToExcel} style={{ height: '44px' }}><Download size={18} /></button>
-            <button className="btn btn-primary" onClick={() => { setPreFilledData(null); setEditingOperation(null); setTradeInVehicles([]); setShowModal(true); }} style={{ height: '44px' }}><Plus size={18} /> Nuevo</button>
+            <button className="btn btn-outline" onClick={exportToExcel} style={{ height: '40px', padding: '0 12px' }}><Download size={16} /></button>
+            <button className="btn btn-primary" onClick={() => { setPreFilledData(null); setEditingOperation(null); setTradeInVehicles([]); setShowModal(true); }} style={{ height: '40px', padding: '0 16px', fontSize: '14px' }}><Plus size={16} /> Nuevo</button>
           </div>
         </header>
 
@@ -692,59 +692,59 @@ function App() {
         )}
 
         {activeTab === 'tree' && (selectedTraceability || isTreeLoading) && (
-          <div className="animate-in" style={{ display: 'flex', gap: '24px', marginBottom: '32px' }}>
-            <div className="card glass" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '12px', borderRadius: '12px' }}>
-                <Package color="#3b82f6" size={24} />
+          <div className="animate-in metrics-grid" style={{ marginBottom: '32px' }}>
+            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '10px', borderRadius: '12px', display: 'flex', flexShrink: 0 }}>
+                <Package color="#3b82f6" size={20} />
               </div>
-              <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Inversión Inicial (Costo)</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Inversión Inicial</div>
                 {isTreeLoading ? (
-                  <div className="skeleton" style={{ height: '28px', width: '120px', marginTop: '4px' }}></div>
+                  <div className="skeleton" style={{ height: '24px', width: '80%', marginTop: '4px' }}></div>
                 ) : (
-                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3b82f6' }}>USD {stats.totalInvestment.toLocaleString()}</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#3b82f6' }}>USD {stats.totalInvestment.toLocaleString()}</div>
                 )}
               </div>
             </div>
 
-            <div className="card glass" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{ background: stats.totalProfit > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '12px' }}>
-                <TrendingUp color={stats.totalProfit > 0 ? '#10b981' : '#ef4444'} size={24} />
+            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ background: stats.totalProfit > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '12px', display: 'flex', flexShrink: 0 }}>
+                <TrendingUp color={stats.totalProfit > 0 ? '#10b981' : '#ef4444'} size={20} />
               </div>
-              <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Ganancia Estimada</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Ganancia Est.</div>
                 {isTreeLoading ? (
-                  <div className="skeleton" style={{ height: '28px', width: '120px', marginTop: '4px' }}></div>
+                  <div className="skeleton" style={{ height: '24px', width: '80%', marginTop: '4px' }}></div>
                 ) : (
-                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: stats.totalProfit > 0 ? '#10b981' : '#ef4444' }}>USD {stats.totalProfit.toLocaleString()}</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: stats.totalProfit > 0 ? '#10b981' : '#ef4444' }}>USD {stats.totalProfit.toLocaleString()}</div>
                 )}
               </div>
             </div>
             
-            <div className="card glass" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{ background: 'rgba(170, 59, 255, 0.1)', padding: '12px', borderRadius: '12px' }}>
-                <Package color="var(--primary)" size={24} />
+            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ background: 'rgba(170, 59, 255, 0.1)', padding: '10px', borderRadius: '12px', display: 'flex', flexShrink: 0 }}>
+                <Package color="var(--primary)" size={20} />
               </div>
-              <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Vehículos en el Árbol</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Vehículos Árbol</div>
                 {isTreeLoading ? (
-                  <div className="skeleton" style={{ height: '28px', width: '120px', marginTop: '4px' }}></div>
+                  <div className="skeleton" style={{ height: '24px', width: '80%', marginTop: '4px' }}></div>
                 ) : (
-                  <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.tradeInCount} unidades</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{stats.tradeInCount} uni</div>
                 )}
               </div>
             </div>
 
-            <div className="card glass" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '12px', borderRadius: '12px' }}>
-                <Package color="#3b82f6" size={24} />
+            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '10px', borderRadius: '12px', display: 'flex', flexShrink: 0 }}>
+                <Package color="#3b82f6" size={20} />
               </div>
-              <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Total en Stock</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Stock Actual</div>
                 {isTreeLoading ? (
-                  <div className="skeleton" style={{ height: '28px', width: '120px', marginTop: '4px' }}></div>
+                  <div className="skeleton" style={{ height: '24px', width: '80%', marginTop: '4px' }}></div>
                 ) : (
-                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3b82f6' }}>{stockVehicles.length} unidades</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#3b82f6' }}>{stockVehicles.length} uni</div>
                 )}
               </div>
             </div>
