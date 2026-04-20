@@ -16,7 +16,8 @@ import {
   Calendar as CalendarIcon,
   LogOut,
   Users,
-  Shield
+  Shield,
+  Menu
 } from 'lucide-react'
 import './index.css'
 import { db } from './services/db'
