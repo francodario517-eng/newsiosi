@@ -39,8 +39,8 @@ const VehicleNode = ({ data }) => {
   return (
     <div className={`card glass vehicle-node ${isHighlighted ? 'highlighted-node' : ''}`}
       style={{ 
-        padding: '24px', 
-        width: '380px', 
+        padding: '16px', 
+        width: '300px', 
         textAlign: 'left',
         fontSize: '13px',
         fontFamily: "'Courier New', Courier, monospace",

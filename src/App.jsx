@@ -13,7 +13,8 @@ import {
   X,
   TrendingUp,
   Package,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Menu
 } from 'lucide-react'
 import './index.css'
 import { db } from './services/db'
@@ -40,6 +41,7 @@ function App() {
   const [isTreeLoading, setIsTreeLoading] = useState(false)
   const [session, setSession] = useState(null)
   const [editingOperation, setEditingOperation] = useState(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   
   // Money formatting helpers
   const formatMoney = (val) => {
@@ -158,6 +160,7 @@ function App() {
     localStorage.setItem('period', period);
     if (highlightedId) localStorage.setItem('highlightedId', highlightedId);
     else localStorage.removeItem('highlightedId');
+    setIsMenuOpen(false); // Close menu on tab change
   }, [activeTab, searchQuery, period, highlightedId]);
 
   // Restore/Refresh traceability if there was a highlighted vehicle or operations change
@@ -578,8 +581,22 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar - Same as before */}
-      <aside className="sidebar">
+      {/* Mobile Header */}
+      <div className="mobile-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Car size={24} color="var(--primary)" />
+          <span style={{ fontWeight: 'bold', fontSize: '18px' }}>MH</span>
+        </div>
+        <button onClick={() => setIsMenuOpen(!isMenuOpen)} style={{ background: 'none', border: 'none', color: 'white' }}>
+          {isMenuOpen ? <X size={24} /> : <Menu size={24} />} 
+        </button>
+      </div>
+
+      {/* Menu Overlay */}
+      {isMenuOpen && <div className="menu-overlay" onClick={() => setIsMenuOpen(false)}></div>}
+
+      {/* Sidebar */}
+      <aside className={`sidebar ${isMenuOpen ? 'open' : ''}`}>
         <div className="logo-section">
           <Car size={32} color="var(--primary)" />
           <h2 style={{ color: 'white', marginTop: '12px', letterSpacing: '1px' }}>MH</h2>
@@ -795,10 +812,9 @@ function App() {
         </section>
       </main>
 
-      {/* Register Modal */}
       {showModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
-          <div className="glass card animate-in" style={{ width: '600px', padding: '32px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(8px)', padding: '16px' }}>
+          <div className="glass card animate-in" style={{ width: '100%', maxWidth: '600px', padding: '32px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
               <h2 style={{ color: 'white' }}>{editingOperation ? 'Editar Registro' : preFilledData ? 'Nueva Rama Comercial' : 'Nueva Operación'}</h2>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'white' }}><X size={24} /></button>

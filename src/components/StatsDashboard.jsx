@@ -30,7 +30,7 @@ export function StatsDashboard({ metrics, stock }) {
   return (
     <div style={{ padding: '24px' }}>
       {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', marginBottom: '24px' }}>
+      <div className="stats-grid" style={{ marginBottom: '24px' }}>
         <div className="card glass" style={{ padding: '20px' }}>
           <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Ventas Totales</div>
           <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'white', marginTop: '8px' }}>
@@ -57,7 +57,7 @@ export function StatsDashboard({ metrics, stock }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px' }}>
+      <div className="charts-grid">
         
         {/* Sales vs Purchases Chart */}
         <div className="card glass" style={{ height: '350px', padding: '24px' }}>
