@@ -149,14 +149,19 @@ function App() {
 
   useEffect(() => {
     const loadAll = async () => {
-      // Load operations
-      const data = await db.getOperations();
-      setOperations(data);
-      
-      // Reload profile if we have a session (to handle permission changes)
-      if (session?.user) {
-        const profile = await db.getProfile(session.user.id);
-        setUserProfile(profile);
+      try {
+        // Load operations
+        const data = await db.getOperations();
+        setOperations(data);
+        
+        // Reload profile if we have a session (to handle permission changes)
+        if (session?.user) {
+          const profile = await db.getProfile(session.user.id);
+          setUserProfile(profile);
+        }
+      } catch (error) {
+        console.error('Error in loadAll:', error);
+        // This prevents the critical crash error boundary from showing up
       }
     };
     loadAll();
@@ -885,34 +890,69 @@ function App() {
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'white' }}><X size={24} /></button>
             </div>
 
-            <form onSubmit={handleSaveOperation}>
+            <form key={editingOperation?.id || preFilledData?.operation_id || 'new'} onSubmit={handleSaveOperation}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div><label>Tipo</label><select name="type" required defaultValue={preFilledData?.type || 'Venta'}><option value="">Seleccionar...</option><option value="Venta">Venta</option><option value="Compra">Compra</option><option value="Rescisión">Rescisión</option></select></div>
-                <div><label>Pago</label><select name="payment" required defaultValue={preFilledData?.payment || 'Contado'}><option value="">Seleccionar...</option><option value="Crédito">Crédito</option><option value="Contado">Contado</option></select></div>
+                <div>
+                  <label>Tipo</label>
+                  <select 
+                    name="type" 
+                    required 
+                    defaultValue={editingOperation?.operation_type?.toLowerCase() || preFilledData?.type?.toLowerCase() || 'venta'}
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="venta">Venta</option>
+                    <option value="compra">Compra</option>
+                    <option value="rescisión">Rescisión</option>
+                    <option value="remate">Remate</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Pago</label>
+                  <select 
+                    name="payment" 
+                    required 
+                    defaultValue={editingOperation?.payment_type?.toLowerCase() || preFilledData?.payment?.toLowerCase() || 'contado'}
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="crédito">Crédito</option>
+                    <option value="contado">Contado</option>
+                  </select>
+                </div>
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div><label>Fecha</label><input name="date" type="date" required defaultValue={preFilledData?.date || new Date().toISOString().split('T')[0]} /></div>
+                <div>
+                  <label>Fecha</label>
+                  <input 
+                    name="date" 
+                    type="date" 
+                    required 
+                    defaultValue={
+                      editingOperation ? (editingOperation.date.includes('/') ? editingOperation.date.split('/').reverse().join('-') : editingOperation.date) :
+                      (preFilledData?.date || new Date().toISOString().split('T')[0])
+                    } 
+                  />
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div><label>Chapa</label><input name="chapa" defaultValue={preFilledData?.chapa || ''} /></div>
-                  <div><label>Chasis</label><input name="chasis" defaultValue={preFilledData?.chasis || ''} /></div>
+                  <div><label>Chapa</label><input name="chapa" defaultValue={editingOperation?.vehicles?.[0]?.chapa || preFilledData?.chapa || ''} /></div>
+                  <div><label>Chasis</label><input name="chasis" defaultValue={editingOperation?.vehicles?.[0]?.chasis || preFilledData?.chasis || ''} /></div>
                 </div>
               </div>
 
               <label>Descripción del Vehículo</label>
-              <input name="description" defaultValue={preFilledData?.description || ''} />
+              <input name="description" defaultValue={editingOperation?.vehicles?.[0]?.description || preFilledData?.description || ''} />
               
               <label>Comprador / Vendedor</label>
-              <input name="buyer" defaultValue={preFilledData?.buyer || ''} placeholder="Nombre completo" />
+              <input name="buyer" defaultValue={editingOperation?.buyer || preFilledData?.buyer || ''} placeholder="Nombre completo" />
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '16px' }}>
-                 <div><label>Entrega Contado</label><input name="delivery_amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(preFilledData?.delivery_amount || 0)} placeholder="0" /></div>
-                 <div><label>Cuotas</label><input name="installments" type="number" defaultValue={preFilledData?.installments || 0} placeholder="0" /></div>
-                 <div><label>Monto Crédito</label><input name="credit_amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(preFilledData?.credit_amount || 0)} placeholder="0" /></div>
+                 <div><label>Entrega Contado</label><input name="delivery_amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(editingOperation?.delivery_amount || preFilledData?.delivery_amount || 0)} placeholder="0" /></div>
+                 <div><label>Cuotas</label><input name="installments" type="number" defaultValue={editingOperation?.installments || preFilledData?.installments || 0} placeholder="0" /></div>
+                 <div><label>Monto Crédito</label><input name="credit_amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(editingOperation?.credit_amount || preFilledData?.credit_amount || 0)} placeholder="0" /></div>
               </div>
 
               <label style={{ marginTop: '16px' }}>Monto Total (Total Operación)</label>
-              <input name="amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(preFilledData?.amount || 0)} placeholder="0.00" />
+              <input name="amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(editingOperation?.total_amount || preFilledData?.amount || 0)} placeholder="0.00" />
               
               <div style={{ marginTop: '24px', padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
