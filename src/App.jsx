@@ -17,6 +17,7 @@ import {
   LogOut,
   Users,
   Shield,
+  Edit2,
   Menu
 } from 'lucide-react'
 import './index.css'
