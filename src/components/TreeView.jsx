@@ -20,20 +20,20 @@ const VehicleNode = ({ data }) => {
   let statusColor = 'rgba(255,255,255,0.05)'; // Default
   let auraColor = 'transparent';
   
-  if (isVenta) {
+  if (isHighlighted) {
+    statusColor = '#fff'; // White border for selection
+    auraColor = 'rgba(255, 255, 255, 0.6)'; // Bright aura
+  } else if (isVenta) {
     if (hasTradeIn) {
-      statusColor = '#10b981'; // Green for sales with trade-ins
+      statusColor = '#10b981';
       auraColor = 'rgba(16, 185, 129, 0.3)';
     } else {
-      statusColor = '#ef4444'; // Red for sales without trade-ins
+      statusColor = '#ef4444';
       auraColor = 'rgba(239, 68, 68, 0.3)';
     }
   } else if (isCompraOrRescision) {
-    statusColor = '#10b981'; // Green for entries (Purchases/Rescissions)
+    statusColor = '#10b981';
     auraColor = 'rgba(16, 185, 129, 0.3)';
-  } else if (isHighlighted) {
-    statusColor = 'var(--primary)';
-    auraColor = 'rgba(170, 59, 255, 0.3)';
   }
 
   return (
@@ -45,15 +45,17 @@ const VehicleNode = ({ data }) => {
         fontSize: '13px',
         fontFamily: "'Courier New', Courier, monospace",
         lineHeight: '1.4',
-        border: '2px solid',
+        border: isHighlighted ? '3px solid' : '2px solid',
         borderColor: statusColor,
         background: 'rgba(26, 27, 35, 0.95)',
         color: '#d1d5db',
-        boxShadow: `0 0 20px ${auraColor}`,
+        boxShadow: `0 0 30px ${auraColor}`,
         position: 'relative',
-        transition: 'all 0.3s ease'
+        transition: 'all 0.3s ease',
+        transform: isHighlighted ? 'scale(1.05)' : 'scale(1)',
       }}
     >
+      {isHighlighted && <div className="selected-badge">SELECCIONADO</div>}
       {/* Action Buttons (Top Right) */}
       <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
         <button 
