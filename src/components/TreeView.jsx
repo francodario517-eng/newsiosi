@@ -61,11 +61,13 @@ const VehicleNode = ({ data }) => {
             e.stopPropagation();
             if (data.onEditOperation) data.onEditOperation(data.raw_data);
           }}
-          title="Editar operación"
+          title={data.onEditOperation ? "Editar operación" : "No tienes permisos para editar"}
           style={{ 
             background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', 
             borderRadius: '4px', width: '28px', height: '28px', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+            cursor: data.onEditOperation ? 'pointer' : 'not-allowed',
+            opacity: data.onEditOperation ? 1 : 0.3,
             padding: 0, color: 'var(--text-muted)'
           }}
           className="node-action-btn"
@@ -118,10 +120,12 @@ const VehicleNode = ({ data }) => {
                   operation_id: data.operation_id
                 });
               }}
-              title="Crear rama desde este vehículo"
+              title={data.onAddBranch ? "Crear rama desde este vehículo" : "No tienes permisos para agregar"}
               style={{ 
                 background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                cursor: data.onAddBranch ? 'pointer' : 'not-allowed',
+                opacity: data.onAddBranch ? 1 : 0.3,
                 padding: 0, color: 'white', flexShrink: 0
               }}
             >
@@ -163,10 +167,12 @@ const VehicleNode = ({ data }) => {
                     operation_id: data.operation_id
                   });
                 }}
-                title="Crear rama desde este vehículo"
+                title={data.onAddBranch ? "Crear rama desde este vehículo" : "No tienes permisos para agregar"}
                 style={{ 
                   background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', 
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                  cursor: data.onAddBranch ? 'pointer' : 'not-allowed',
+                  opacity: data.onAddBranch ? 1 : 0.3,
                   padding: 0, color: 'white', flexShrink: 0
                 }}
               >

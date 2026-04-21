@@ -219,7 +219,7 @@ function App() {
       description: vehicleInfo.description,
       chapa: vehicleInfo.chapa,
       chasis: vehicleInfo.chasis,
-      parentId: vehicleInfo.operation_id,
+      operation_id: vehicleInfo.operation_id,
       type: 'Venta' // Default to sale for branches
     });
     setEditingOperation(null);
@@ -255,7 +255,7 @@ function App() {
        chapa: op.vehicles?.find(v => v.role === 'principal')?.chapa || '',
        chasis: op.vehicles?.find(v => v.role === 'principal')?.chasis || '',
     });
-    setTradeInVehicles((editingOperation.vehicles || [])
+    setTradeInVehicles((op.vehicles || [])
         .filter(v => v.role === 'parte_pago')
         .map(v => ({ ...v, valuation: formatMoney(v.valuation) }))
       );
