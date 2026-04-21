@@ -7,7 +7,7 @@ import ReactFlow, {
   Position
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit2, Pencil, Trash2 } from 'lucide-react';
 
 // Custom Node for a 1:1 match with the user's detailed example
 const VehicleNode = ({ data }) => {
