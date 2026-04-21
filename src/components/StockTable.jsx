@@ -80,15 +80,20 @@ export function StockTable({ stock, onSellVehicle }) {
                     </div>
                   </td>
                   <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                    {onSellVehicle && (
-                      <button 
-                        className="btn btn-primary" 
-                        style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '8px' }}
-                        onClick={() => onSellVehicle(item)}
-                      >
-                        Vender
-                      </button>
-                    )}
+                    <button 
+                      className="btn btn-primary" 
+                      style={{ 
+                        padding: '8px 16px', fontSize: '12px', borderRadius: '8px',
+                        opacity: onSellVehicle ? 1 : 0.4,
+                        cursor: onSellVehicle ? 'pointer' : 'not-allowed',
+                        background: onSellVehicle ? 'var(--primary)' : 'rgba(255, 255, 255, 0.1)',
+                        border: onSellVehicle ? 'none' : '1px solid rgba(255, 255, 255, 0.1)'
+                      }}
+                      onClick={onSellVehicle ? (() => onSellVehicle(item)) : null}
+                      title={onSellVehicle ? "Vender vehículo" : "No tienes permisos para vender"}
+                    >
+                      Vender
+                    </button>
                   </td>
                 </tr>
               ))

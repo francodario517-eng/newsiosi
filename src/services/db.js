@@ -24,6 +24,10 @@ supabase
     console.log('Realtime change in vehicles:', payload);
     db.notify();
   })
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+    console.log('Realtime change in profiles:', payload);
+    db.notify();
+  })
   .subscribe();
 
 export const db = {

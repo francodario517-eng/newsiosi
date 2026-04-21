@@ -79,12 +79,15 @@ const VehicleNode = ({ data }) => {
             e.stopPropagation();
             if (data.onDeleteOperation) data.onDeleteOperation(data.raw_data);
           }}
-          title="Eliminar operación"
+          title={data.onDeleteOperation ? "Eliminar operación" : "No tienes permisos para eliminar"}
           style={{ 
-            background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', 
+            background: data.onDeleteOperation ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.05)', 
+            border: `1px solid ${data.onDeleteOperation ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`, 
             borderRadius: '4px', width: '28px', height: '28px', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-            padding: 0, color: '#ef4444'
+            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+            cursor: data.onDeleteOperation ? 'pointer' : 'not-allowed',
+            opacity: data.onDeleteOperation ? 1 : 0.3,
+            padding: 0, color: data.onDeleteOperation ? '#ef4444' : 'var(--text-muted)'
           }}
           className="node-action-btn"
         >

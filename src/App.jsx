@@ -147,13 +147,20 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const loadOps = async () => {
+    const loadAll = async () => {
+      // Load operations
       const data = await db.getOperations();
       setOperations(data);
+      
+      // Reload profile if we have a session (to handle permission changes)
+      if (session?.user) {
+        const profile = await db.getProfile(session.user.id);
+        setUserProfile(profile);
+      }
     };
-    loadOps();
-    return db.subscribe(loadOps);
-  }, [])
+    loadAll();
+    return db.subscribe(loadAll);
+  }, [session])
   
   // Prevent number input value changes on scroll globally
   useEffect(() => {
@@ -639,9 +646,18 @@ function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="glass" style={{ padding: '16px', borderRadius: '14px', marginBottom: '16px', background: 'rgba(255,255,255,0.02)' }}>
-            <div style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px' }}>Sesión activa</div>
+          <div className="glass" style={{ padding: '16px', borderRadius: '14px', marginBottom: '16px', background: 'rgba(255,255,255,0.02)', border: !userProfile ? '1px solid #ef4444' : '1px solid transparent' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Sesión activa</span>
+              <span style={{ color: userProfile?.can_edit ? '#10b981' : '#ef4444' }}>{userProfile ? (userProfile.can_edit ? 'MODO EDITOR' : 'MODO LECTURA') : 'PERFIL NO ENCONTRADO'}</span>
+            </div>
             <div style={{ color: 'white', fontWeight: 'bold', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{session?.user?.email}</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'monospace' }}>ID: {session?.user?.id}</div>
+            <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>
+               <Shield size={12} title="Admin" color={userProfile?.is_admin ? 'var(--primary)' : 'rgba(255,255,255,0.1)'} />
+               <Edit2 size={12} title="Edit" color={userProfile?.can_edit ? '#3b82f6' : 'rgba(255,255,255,0.1)'} />
+               <Trash2 size={12} title="Delete" color={userProfile?.can_delete ? '#ef4444' : 'rgba(255,255,255,0.1)'} />
+            </div>
           </div>
           <button className="btn btn-outline" style={{ width: '100%', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }} onClick={() => supabase.auth.signOut()}>
             <LogOut size={20} /> Cerrar Sesión
@@ -695,7 +711,20 @@ function App() {
               </div>
             )}
             <button className="btn btn-outline" onClick={exportToExcel} style={{ height: '40px', padding: '0 12px' }}><Download size={16} /></button>
-            <button className="btn btn-primary" onClick={() => { setPreFilledData(null); setEditingOperation(null); setTradeInVehicles([]); setShowModal(true); }} style={{ height: '40px', padding: '0 16px', fontSize: '14px' }}><Plus size={16} /> Nuevo</button>
+            <button 
+              className="btn btn-primary" 
+              onClick={userProfile?.can_edit ? (() => { setPreFilledData(null); setEditingOperation(null); setTradeInVehicles([]); setShowModal(true); }) : null} 
+              title={userProfile?.can_edit ? "Nueva Operación" : "No tienes permisos para crear"}
+              style={{ 
+                height: '40px', padding: '0 16px', fontSize: '14px',
+                opacity: userProfile?.can_edit ? 1 : 0.4,
+                cursor: userProfile?.can_edit ? 'pointer' : 'not-allowed',
+                background: userProfile?.can_edit ? 'var(--primary)' : 'rgba(255,255,255,0.1)',
+                border: userProfile?.can_edit ? 'none' : '1px solid rgba(255,255,255,0.1)'
+              }}
+            >
+              <Plus size={16} /> Nuevo
+            </button>
           </div>
         </header>
 
