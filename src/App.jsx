@@ -719,22 +719,22 @@ function App() {
           mainRow.height = 20;
 
           if (nodeType === 'compra') {
-            fillRow(mainRow, 'FF0c2418');
-            mainRow.getCell('operation').font = { bold: true, color: { argb: 'FF10b981' }, size: 10 };
+            fillRow(mainRow, 'FFdff2eb');
+            mainRow.getCell('operation').font = { bold: true, color: { argb: 'FF1a6b45' }, size: 10 };
           } else if (nodeType === 'venta') {
-            fillRow(mainRow, 'FF260a0a');
-            mainRow.getCell('operation').font = { bold: true, color: { argb: 'FFef4444' }, size: 10 };
+            fillRow(mainRow, 'FFfde8e8');
+            mainRow.getCell('operation').font = { bold: true, color: { argb: 'FF9b2020' }, size: 10 };
           } else {
-            fillRow(mainRow, 'FF1a1b23');
-            mainRow.getCell('operation').font = { bold: true, color: { argb: 'FFfbbf24' }, size: 10 };
+            fillRow(mainRow, 'FFf0eeff');
+            mainRow.getCell('operation').font = { bold: true, color: { argb: 'FF5a3fa0' }, size: 10 };
           }
 
           // Una fila por cada vehículo entregado como parte de pago
           tradeIns.forEach(t => {
             const tId = (t.chasis || t.chapa || '').trim().toUpperCase();
             const inStock = tId ? stockSet.has(tId) : false;
-            const statusColor = inStock ? 'FF10b981' : 'FFef4444';
-            const bgColor = inStock ? 'FF0a1f12' : 'FF1f0a0a';
+            const statusColor = inStock ? 'FF1a6b45' : 'FF9b2020';
+            const bgColor = inStock ? 'FFedf7f2' : 'FFfceeee';
 
             const trRow = sheet.addRow({
               chain_id:     '',
