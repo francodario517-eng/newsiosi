@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { ReactFlow, Background, Controls, MiniMap, Handle, Position } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+import ReactFlow, { Background, Controls, MiniMap, Handle, Position } from 'reactflow';
+import 'reactflow/dist/style.css';
 import { PlusCircle, Edit2, Pencil, Trash2 } from 'lucide-react';
 
 // Custom Node for a 1:1 match with the user's detailed example
