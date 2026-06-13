@@ -112,17 +112,7 @@ export function Auth({ onSession }) {
             {loading ? <Loader className="animate-spin" size={20} /> : 'INICIAR SESIÓN'}
           </button>
 
-          <button 
-            type="button" 
-            onClick={() => {
-              localStorage.setItem('USE_LOCAL_MOCK', 'true');
-              onSession({ user: { id: 'local-mock-user', email: 'modo-local@motorhaus.com' } });
-            }}
-            className="btn btn-outline" 
-            style={{ width: '100%', height: '48px', justifyContent: 'center' }}
-          >
-            MODO LOCAL (TEMPORAL)
-          </button>
+
         </form>
       </div>
     </div>

@@ -132,112 +132,6 @@ export const db = {
   },
 
   getOperations: async () => {
-    if (localStorage.getItem('USE_LOCAL_MOCK') === 'true') {
-      let opsStr = localStorage.getItem('mock_operations');
-      if (!opsStr || opsStr === '[]') {
-        const MOCK_DATA = [
-          {
-            id: "op-6",
-            user_id: "local-mock-user",
-            operation_type: "compra",
-            payment_type: "contado",
-            date: "2024-03-10",
-            currency: "USD",
-            total_amount: 70000,
-            buyer: "Baviera Motors",
-            parent_id: null,
-            parentId: null,
-            vehicles: [
-              { operation_id: "op-6", chapa: "EEE555", chasis: "BMW123", description: "BMW X5 2023", color: "Negro", role: "principal", valuation: 0, id: "v-6" }
-            ]
-          },
-          {
-            id: "op-5",
-            user_id: "local-mock-user",
-            operation_type: "venta",
-            payment_type: "financiado",
-            date: "2024-03-01",
-            currency: "USD",
-            total_amount: 24000,
-            delivery_amount: 10000,
-            installments: 10,
-            credit_amount: 14000,
-            buyer: "Jorge Silva",
-            parent_id: "op-3",
-            parentId: "op-3",
-            vehicles: [
-              { operation_id: "op-5", chapa: "CCC333", chasis: "KIA123", description: "Kia Sportage 2022", color: "Gris", role: "principal", valuation: 0, id: "v-5a" },
-              { operation_id: "op-5", chapa: "DDD444", chasis: "HB20123", description: "Hyundai HB20 2019", color: "Rojo", role: "parte_pago", valuation: 8000, id: "v-5b" }
-            ]
-          },
-          {
-            id: "op-4",
-            user_id: "local-mock-user",
-            operation_type: "venta",
-            payment_type: "contado",
-            date: "2024-02-15",
-            currency: "USD",
-            total_amount: 18000,
-            buyer: "Maria Lopez",
-            parent_id: "op-2",
-            parentId: "op-2",
-            vehicles: [
-              { operation_id: "op-4", chapa: "BBB222", chasis: "COROLLA123", description: "Toyota Corolla 2018", color: "Plata", role: "principal", valuation: 0, id: "v-4" }
-            ]
-          },
-          {
-            id: "op-3",
-            user_id: "local-mock-user",
-            operation_type: "compra",
-            payment_type: "contado",
-            date: "2024-02-05",
-            currency: "USD",
-            total_amount: 20000,
-            buyer: "Particular",
-            parent_id: null,
-            parentId: null,
-            vehicles: [
-              { operation_id: "op-3", chapa: "CCC333", chasis: "KIA123", description: "Kia Sportage 2022", color: "Gris", role: "principal", valuation: 0, id: "v-3" }
-            ]
-          },
-          {
-            id: "op-2",
-            user_id: "local-mock-user",
-            operation_type: "venta",
-            payment_type: "contado",
-            date: "2024-01-20",
-            currency: "USD",
-            total_amount: 40000,
-            buyer: "Carlos Gomez",
-            parent_id: "op-1",
-            parentId: "op-1",
-            vehicles: [
-              { operation_id: "op-2", chapa: "AAA111", chasis: "HILUX123", description: "Toyota Hilux 2020", color: "Blanco", role: "principal", valuation: 0, id: "v-2a" },
-              { operation_id: "op-2", chapa: "BBB222", chasis: "COROLLA123", description: "Toyota Corolla 2018", color: "Plata", role: "parte_pago", valuation: 15000, id: "v-2b" }
-            ]
-          },
-          {
-            id: "op-1",
-            user_id: "local-mock-user",
-            operation_type: "compra",
-            payment_type: "contado",
-            date: "2024-01-10",
-            currency: "USD",
-            total_amount: 35000,
-            buyer: "Importadora XYZ",
-            parent_id: null,
-            parentId: null,
-            vehicles: [
-              { operation_id: "op-1", chapa: "AAA111", chasis: "HILUX123", description: "Toyota Hilux 2020", color: "Blanco", role: "principal", valuation: 0, id: "v-1" }
-            ]
-          }
-        ];
-        opsStr = JSON.stringify(MOCK_DATA);
-        localStorage.setItem('mock_operations', opsStr);
-      }
-      return JSON.parse(opsStr);
-    }
-
     const { data, error } = await supabase
       .from('operations')
       .select('*, vehicles(*)')
@@ -257,40 +151,6 @@ export const db = {
   },
 
   addOperation: async (op) => {
-    if (localStorage.getItem('USE_LOCAL_MOCK') === 'true') {
-      const mockOps = JSON.parse(localStorage.getItem('mock_operations') || '[]');
-      const newOpId = 'mock-' + Date.now();
-      const opData = {
-        id: newOpId,
-        user_id: op.user_id,
-        operation_type: op.operation_type,
-        payment_type: op.payment_type,
-        date: op.date.split('/').reverse().join('-'),
-        currency: op.currency,
-        total_amount: op.total_amount,
-        buyer: op.buyer,
-        delivery_amount: op.delivery_amount || 0,
-        installments: op.installments || 0,
-        credit_amount: op.credit_amount || 0,
-        parent_id: op.parentId || null,
-        vehicles: op.vehicles ? op.vehicles.map((v, i) => ({
-          operation_id: newOpId,
-          chapa: v.chapa,
-          chasis: v.chasis,
-          description: v.description,
-          color: v.color || '',
-          role: v.role,
-          valuation: v.valuation || 0,
-          id: 'mock-veh-' + Date.now() + i
-        })) : [],
-        parentId: op.parentId || null
-      };
-      mockOps.unshift(opData);
-      localStorage.setItem('mock_operations', JSON.stringify(mockOps));
-      db.notify();
-      return opData;
-    }
-
     return withMutation(async () => {
       // 1. Insert Operation
       const { data: opData, error: opError } = await supabase
@@ -337,41 +197,6 @@ export const db = {
   },
 
   updateOperation: async (id, op) => {
-    if (localStorage.getItem('USE_LOCAL_MOCK') === 'true') {
-      const mockOps = JSON.parse(localStorage.getItem('mock_operations') || '[]');
-      const index = mockOps.findIndex(o => o.id === id);
-      if (index !== -1) {
-        mockOps[index] = {
-          ...mockOps[index],
-          operation_type: op.operation_type,
-          payment_type: op.payment_type,
-          date: op.date.split('/').reverse().join('-'),
-          currency: op.currency,
-          total_amount: op.total_amount,
-          buyer: op.buyer,
-          delivery_amount: op.delivery_amount || 0,
-          installments: op.installments || 0,
-          credit_amount: op.credit_amount || 0,
-          parent_id: op.parentId || null,
-          parentId: op.parentId || null,
-          vehicles: op.vehicles ? op.vehicles.map((v, i) => ({
-            operation_id: id,
-            chapa: v.chapa,
-            chasis: v.chasis,
-            description: v.description,
-            color: v.color || '',
-            role: v.role,
-            valuation: v.valuation || 0,
-            id: 'mock-veh-' + Date.now() + i
-          })) : []
-        };
-        localStorage.setItem('mock_operations', JSON.stringify(mockOps));
-        db.notify();
-        return mockOps[index];
-      }
-      throw new Error("Operation not found");
-    }
-
     return withMutation(async () => {
       // 1. Update Operation
       const { data: opData, error: opError } = await supabase
@@ -612,14 +437,6 @@ export const db = {
   },
 
   deleteOperation: async (id) => {
-    if (localStorage.getItem('USE_LOCAL_MOCK') === 'true') {
-      let mockOps = JSON.parse(localStorage.getItem('mock_operations') || '[]');
-      mockOps = mockOps.filter(o => o.id !== id);
-      localStorage.setItem('mock_operations', JSON.stringify(mockOps));
-      db.notify();
-      return true;
-    }
-
     return withMutation(async () => {
       const { error } = await supabase
         .from('operations')
@@ -632,10 +449,6 @@ export const db = {
   },
 
   getProfile: async (userId) => {
-    if (localStorage.getItem('USE_LOCAL_MOCK') === 'true') {
-      return { id: userId, email: 'modo-local@motorhaus.com', is_admin: true, can_edit: true, can_delete: true };
-    }
-
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -650,10 +463,6 @@ export const db = {
   },
 
   getAllProfiles: async () => {
-    if (localStorage.getItem('USE_LOCAL_MOCK') === 'true') {
-      return [{ id: 'local-mock-user', email: 'modo-local@motorhaus.com', is_admin: true, can_edit: true, can_delete: true }];
-    }
-
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -667,11 +476,6 @@ export const db = {
   },
 
   updateProfile: async (userId, updates) => {
-    if (localStorage.getItem('USE_LOCAL_MOCK') === 'true') {
-      db.notify();
-      return { id: userId, ...updates };
-    }
-
     return withMutation(async () => {
       const { data, error } = await supabase
         .from('profiles')

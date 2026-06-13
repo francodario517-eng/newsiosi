@@ -298,7 +298,13 @@ function App() {
 
   const [tradeInVehicles, setTradeInVehicles] = useState([])
 
+
   useEffect(() => {
+    // Limpiar claves del modo mock local (eliminado). Garantiza que ningún usuario
+    // quede con datos ficticios en localStorage de sesiones anteriores.
+    localStorage.removeItem('USE_LOCAL_MOCK');
+    localStorage.removeItem('mock_operations');
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
