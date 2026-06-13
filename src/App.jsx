@@ -392,7 +392,8 @@ function App() {
         // Find a vehicle from any operation that matches the highlightedId
         const op = operations.find(o => o.id === highlightedId || o.vehicles.some(v => v.chasis === highlightedId || v.chapa === highlightedId));
         if (op) {
-          const vehicleId = op.vehicles[0]?.chasis || op.vehicles[0]?.chapa || op.vehicles[0]?.id;
+          const principalV = (op.vehicles || []).find(v => v.role === 'principal') || op.vehicles?.[0];
+          const vehicleId = principalV?.chasis?.trim() || principalV?.chapa?.trim();
           if (vehicleId) {
             const trace = await db.getVehicleTraceability(vehicleId, operations);
             setSelectedTraceability(trace);
@@ -405,23 +406,27 @@ function App() {
   }, [operations, activeTab, highlightedId]);
 
   const handleSelectOperation = async (op) => {
-    // Solo usar chasis/chapa como identificador — el .id es un UUID de BD, no un identificador de vehículo
     const principalVehicle = (op.vehicles || []).find(v => v.role === 'principal') || op.vehicles?.[0];
     const vehicleId = principalVehicle?.chasis?.trim() || principalVehicle?.chapa?.trim();
-    if (vehicleId) {
-      setHighlightedId(op.id);
-      setActiveTab('tree');
-      setIsTreeLoading(true);
-      
-      try {
-        const trace = await db.getVehicleTraceability(vehicleId, operations);
-        setSelectedTraceability(trace);
-        setStats(financials.getTreeStats(trace));
-      } catch (err) {
-        console.error("Error loading tree:", err);
-      } finally {
-        setIsTreeLoading(false);
-      }
+
+    setHighlightedId(op.id);
+    setActiveTab('tree');
+
+    if (!vehicleId) {
+      setSelectedTraceability({ nodes: [], edges: [] });
+      setStats({ totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0 });
+      return;
+    }
+
+    setIsTreeLoading(true);
+    try {
+      const trace = await db.getVehicleTraceability(vehicleId, operations);
+      setSelectedTraceability(trace);
+      setStats(financials.getTreeStats(trace));
+    } catch (err) {
+      console.error("Error loading tree:", err);
+    } finally {
+      setIsTreeLoading(false);
     }
   }
 
