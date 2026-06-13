@@ -374,6 +374,22 @@ export const db = {
       const principalV = (op.vehicles || []).find(v => v && v.role === 'principal');
       const pIdStr = getVehId(principalV);
 
+      const tradeInsData = (op.vehicles || [])
+        .filter(veh => veh && veh.role === 'parte_pago')
+        .map(t => ({
+          description: t.description,
+          amount: t.valuation,
+          chapa: t.chapa,
+          chasis: t.chasis,
+          isExit: op.operation_type === 'compra',
+          isSold: getVehId(t) ? soldInChain.has(`${op.id}-${getVehId(t)}`) : false
+        }));
+
+      const tradeInTotal = tradeInsData.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+      // Si no se ingresó total_amount, calcularlo desde delivery + credit + partes de pago
+      const effectiveTotal = Number(op.total_amount) ||
+        ((Number(op.delivery_amount) || 0) + (Number(op.credit_amount) || 0) + tradeInTotal);
+
       nodes.push({
         id: nodeId,
         type: 'vehicle',
@@ -388,20 +404,11 @@ export const db = {
           chasis: principalV?.chasis || '',
           isPrincipalSold: pIdStr ? soldInChain.has(`${op.id}-${pIdStr}`) : false,
           currency: op.currency,
-          total_amount: op.total_amount,
+          total_amount: effectiveTotal,
           delivery_amount: op.delivery_amount,
           installments: op.installments,
           credit_amount: op.credit_amount,
-          trade_ins: (op.vehicles || [])
-            .filter(veh => veh && veh.role === 'parte_pago')
-            .map(t => ({
-              description: t.description,
-              amount: t.valuation,
-              chapa: t.chapa,
-              chasis: t.chasis,
-              isExit: op.operation_type === 'compra',
-              isSold: getVehId(t) ? soldInChain.has(`${op.id}-${getVehId(t)}`) : false
-            })),
+          trade_ins: tradeInsData,
           raw_data: op
         },
         position: { x: depth * 750, y: vIdx * 800 + 50 }
