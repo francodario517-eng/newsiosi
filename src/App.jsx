@@ -37,7 +37,7 @@ function App() {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'operations')
   const [selectedTraceability, setSelectedTraceability] = useState(null)
   const [showModal, setShowModal] = useState(false)
-  const [stats, setStats] = useState({ totalProfit: 0, tradeInCount: 0 })
+  const [stats, setStats] = useState({ totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0 })
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('searchQuery') || '')
   const [period, setPeriod] = useState(() => localStorage.getItem('period') || 'all') 
   const [customRange, setCustomRange] = useState({ start: '', end: '' })
@@ -1054,7 +1054,7 @@ function App() {
                 {isTreeLoading ? (
                   <div className="skeleton" style={{ height: '20px', width: '80%', marginTop: '4px' }}></div>
                 ) : (
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#3b82f6' }}>USD {stats.totalInvestment.toLocaleString()}</div>
+                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#3b82f6' }}>USD {(stats.totalInvestment ?? 0).toLocaleString()}</div>
                 )}
               </div>
             </div>
@@ -1068,7 +1068,7 @@ function App() {
                 {isTreeLoading ? (
                   <div className="skeleton" style={{ height: '20px', width: '80%', marginTop: '4px' }}></div>
                 ) : (
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: stats.totalProfit > 0 ? '#10b981' : '#ef4444' }}>USD {stats.totalProfit.toLocaleString()}</div>
+                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: (stats.totalProfit ?? 0) > 0 ? '#10b981' : '#ef4444' }}>USD {(stats.totalProfit ?? 0).toLocaleString()}</div>
                 )}
               </div>
             </div>

@@ -10,7 +10,7 @@ export const financials = {
    */
   getTreeStats: (traceabilityData) => {
     const { nodes } = traceabilityData;
-    if (!nodes || nodes.length === 0) return { totalProfit: 0, tradeInCount: 0 };
+    if (!nodes || nodes.length === 0) return { totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0 };
 
     let totalRevenue = 0;
     let totalInvestment = 0;
