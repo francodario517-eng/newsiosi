@@ -9,8 +9,8 @@ class ErrorBoundary extends React.Component {
     this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, errorMessage: error?.message || 'Error desconocido', errorStack: error?.stack || '' };
   }
 
   componentDidCatch(error, errorInfo) {
@@ -20,14 +20,17 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ 
-          height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', 
+        <div style={{
+          height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', background: '#0a0b10', color: 'white',
           textAlign: 'center', padding: '20px', position: 'fixed', top: 0, left: 0, zIndex: 9999
         }}>
           <h2 style={{ marginBottom: '16px' }}>MANTENIMIENTO / ERROR DE CARGA</h2>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>
-            Hubo un error crítico al procesar los datos de este vehículo. 
+          <p style={{ color: '#ef4444', marginBottom: '8px', fontFamily: 'monospace', fontSize: '13px', maxWidth: '700px' }}>
+            {this.state.errorMessage}
+          </p>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '11px', fontFamily: 'monospace', maxWidth: '700px', whiteSpace: 'pre-wrap', textAlign: 'left' }}>
+            {this.state.errorStack?.split('\n').slice(0, 5).join('\n')}
           </p>
           <button 
             style={{ 
