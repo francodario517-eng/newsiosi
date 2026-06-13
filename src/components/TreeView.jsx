@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import ReactFlow, { Background, Controls, MiniMap, Handle, Position } from 'reactflow';
+import ReactFlow, { Background, Controls, MiniMap, Handle, Position, ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { PlusCircle, Edit2, Pencil, Trash2 } from 'lucide-react';
 
@@ -228,17 +228,19 @@ export function TreeView({ data, onAddBranch, onEditOperation, onDeleteOperation
           <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Conectando con Supabase Engine</div>
         </div>
       ) : (
-        <ReactFlow
-          nodes={styledNodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          fitView
-          style={{ background: 'transparent' }}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background color="#333" gap={20} variant="dots" />
-          <Controls />
-        </ReactFlow>
+        <ReactFlowProvider>
+          <ReactFlow
+            nodes={styledNodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.3 }}
+            style={{ background: 'transparent' }}
+          >
+            <Background color="#333" gap={20} variant="dots" />
+            <Controls />
+          </ReactFlow>
+        </ReactFlowProvider>
       )}
     </div>
   );

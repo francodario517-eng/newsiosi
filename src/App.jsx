@@ -405,7 +405,9 @@ function App() {
   }, [operations, activeTab, highlightedId]);
 
   const handleSelectOperation = async (op) => {
-    const vehicleId = op.vehicles[0]?.chasis || op.vehicles[0]?.chapa || op.vehicles[0]?.id || op.vehicles[0]?.identifier;
+    // Solo usar chasis/chapa como identificador — el .id es un UUID de BD, no un identificador de vehículo
+    const principalVehicle = (op.vehicles || []).find(v => v.role === 'principal') || op.vehicles?.[0];
+    const vehicleId = principalVehicle?.chasis?.trim() || principalVehicle?.chapa?.trim();
     if (vehicleId) {
       setHighlightedId(op.id);
       setActiveTab('tree');
