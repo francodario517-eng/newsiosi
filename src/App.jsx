@@ -300,8 +300,14 @@ function App() {
 
 
   useEffect(() => {
-    // Limpiar claves del modo mock local (eliminado). Garantiza que ningún usuario
-    // quede con datos ficticios en localStorage de sesiones anteriores.
+    // Borrado de caché por versión: al cambiar CACHE_VERSION, todos los navegadores
+    // limpian su localStorage en la próxima visita, eliminando datos de versiones anteriores.
+    const CACHE_VERSION = '2';
+    if (localStorage.getItem('mh_cache_v') !== CACHE_VERSION) {
+      localStorage.clear();
+      localStorage.setItem('mh_cache_v', CACHE_VERSION);
+    }
+    // Limpieza explícita de claves del modo mock local (eliminado).
     localStorage.removeItem('USE_LOCAL_MOCK');
     localStorage.removeItem('mock_operations');
 
