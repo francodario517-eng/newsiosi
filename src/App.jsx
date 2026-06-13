@@ -567,39 +567,78 @@ function App() {
 
   const exportToExcel = async () => {
     try {
-      const targetOps = filteredOperations;
+      const { default: ExcelJS } = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Motor Haus';
+      const sheet = workbook.addWorksheet('Reporte Filtrado');
+
+      sheet.columns = [
+        { header: 'ID Cadena',          key: 'chain_id',     width: 14 },
+        { header: 'Fecha',               key: 'date',         width: 12 },
+        { header: 'Operación',           key: 'operation',    width: 18 },
+        { header: 'Comprador/Vendedor',  key: 'buyer',        width: 30 },
+        { header: 'Vehículo',            key: 'vehicle',      width: 38 },
+        { header: 'Chapa',               key: 'chapa',        width: 12 },
+        { header: 'Chasis',              key: 'chasis',       width: 22 },
+        { header: 'Monto USD',           key: 'amount',       width: 14 },
+        { header: 'Tipo Monto',          key: 'amount_type',  width: 22 },
+        { header: 'Estado Stock',        key: 'stock_status', width: 14 },
+        { header: 'Costo Inversión',     key: 'invest_cost',  width: 16 },
+        { header: 'Clasipar USD',        key: 'clasipar',     width: 13 },
+        { header: 'Marketplace USD',     key: 'marketplace',  width: 15 },
+        { header: 'Instagram USD',       key: 'instagram',    width: 13 },
+        { header: 'Prom. Mercado USD',   key: 'market_avg',   width: 16 },
+        { header: 'Comp. $ USD',         key: 'diff_dollar',  width: 13 },
+        { header: 'Comp. %',             key: 'diff_pct',     width: 10 },
+        { header: 'Datos Reales',        key: 'real_data',    width: 12 },
+      ];
+
+      const headerRow = sheet.getRow(1);
+      headerRow.height = 28;
+      headerRow.eachCell({ includeEmpty: true }, cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0a0b10' } };
+        cell.font = { bold: true, color: { argb: 'FFffffff' }, size: 10 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = { bottom: { style: 'medium', color: { argb: 'FFaa3bff' } } };
+      });
+
+      const stockSet = new Set(
+        stockVehicles.map(v => (v.chasis || v.chapa || '').trim().toUpperCase()).filter(Boolean)
+      );
+
+      const fillRow = (row, argb) => {
+        row.eachCell({ includeEmpty: true }, cell => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb } };
+          cell.alignment = { vertical: 'middle' };
+        });
+      };
+
       const processedIds = new Set();
-      const exportData = [];
       const getVehId = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
       const parseDate = (d) => {
         if (!d) return new Date(0);
         const parts = d.toString().split(/[-/]/).map(Number);
         if (parts.length === 3) {
-          // YYYY-MM-DD
           if (parts[0] > 1000) return new Date(parts[0], parts[1] - 1, parts[2]);
-          // DD-MM-YYYY
           return new Date(parts[2], parts[1] - 1, parts[0]);
         }
         const parsed = new Date(d);
         return isNaN(parsed.getTime()) ? new Date(0) : parsed;
       };
 
-      targetOps.forEach(op => {
+      filteredOperations.forEach(op => {
         if (processedIds.has(op.id)) return;
 
         const chainOps = new Set();
         const toCheck = [op.id];
-        
         while (toCheck.length > 0) {
           const currentId = toCheck.pop();
           if (chainOps.has(currentId)) continue;
           const currentOp = operations.find(o => o.id === currentId);
           if (!currentOp) continue;
-          
           chainOps.add(currentId);
           if (currentOp.parentId && !chainOps.has(currentOp.parentId)) toCheck.push(currentOp.parentId);
           operations.filter(o => o.parentId === currentId && !chainOps.has(o.id)).forEach(o => toCheck.push(o.id));
-          
           const principal = (currentOp.vehicles || []).find(v => v.role === 'principal');
           const pId = getVehId(principal);
           if (pId) {
@@ -613,48 +652,40 @@ function App() {
           });
         }
 
-        const fullChain = Array.from(chainOps).map(id => operations.find(o => o.id === id));
-        
+        const fullChain = Array.from(chainOps).map(id => operations.find(o => o.id === id)).filter(Boolean);
+
         const roots = fullChain.filter(o => {
-            // 1. Explicit parent in chain?
-            if (o.parentId && fullChain.some(p => p.id === o.parentId)) return false;
-            
-            const princ = (o.vehicles || []).find(v => v.role === 'principal');
-            const pId = getVehId(princ);
-            
-            // 2. Was its principal vehicle a trade-in of another op in this chain?
-            // (Trade-in -> Purchase link means Purchase is not root)
-            const isTradeInOfOther = fullChain.some(other => 
-              other.id !== o.id && (other.vehicles || []).some(v => v.role === 'parte_pago' && getVehId(v) === pId)
+          if (o.parentId && fullChain.some(p => p.id === o.parentId)) return false;
+          const princ = (o.vehicles || []).find(v => v.role === 'principal');
+          const pId = getVehId(princ);
+          const isTradeInOfOther = fullChain.some(other =>
+            other.id !== o.id && (other.vehicles || []).some(v => v.role === 'parte_pago' && getVehId(v) === pId)
+          );
+          if (isTradeInOfOther) return false;
+          if (o.operation_type.toLowerCase() === 'venta' && pId) {
+            const hasCompraInChain = fullChain.some(other =>
+              other.operation_type.toLowerCase() === 'compra' &&
+              (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId)
             );
-            if (isTradeInOfOther) return false;
-
-            // 3. Business Priority: A VENTA is NEVER a root if there's a COMPRA of the same car
-            if (o.operation_type.toLowerCase() === 'venta' && pId) {
-              const hasCompraInChain = fullChain.some(other => 
-                other.operation_type.toLowerCase() === 'compra' && 
-                (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId)
-              );
-              if (hasCompraInChain) return false;
-            }
-            
-            // 4. If multiple COMPRAs of same car, keep earliest
-            if (o.operation_type.toLowerCase() === 'compra' && pId) {
-              const earlierCompra = fullChain.some(other => 
-                other.id !== o.id && 
-                other.operation_type.toLowerCase() === 'compra' && 
-                (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId) &&
-                parseDate(other.date) < parseDate(o.date)
-              );
-              if (earlierCompra) return false;
-            }
-
-            return true;
+            if (hasCompraInChain) return false;
+          }
+          if (o.operation_type.toLowerCase() === 'compra' && pId) {
+            const earlierCompra = fullChain.some(other =>
+              other.id !== o.id &&
+              other.operation_type.toLowerCase() === 'compra' &&
+              (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId) &&
+              parseDate(other.date) < parseDate(o.date)
+            );
+            if (earlierCompra) return false;
+          }
+          return true;
         });
-
         roots.sort((a, b) => parseDate(a.date) - parseDate(b.date));
 
-        const pushToExport = (node, depth = 0) => {
+        const chainId = roots[0]?.id.substring(0, 13) || op.id.substring(0, 13);
+        const investCost = roots[0]?.total_amount || 0;
+
+        const pushToSheet = (node, depth = 0) => {
           if (processedIds.has(node.id)) return;
           processedIds.add(node.id);
 
@@ -662,75 +693,105 @@ function App() {
           const principal = node.vehicles?.find(v => v.role === 'principal');
           const pId = getVehId(principal);
           const tradeIns = node.vehicles?.filter(v => v.role === 'parte_pago') || [];
-          const indent = depth > 0 ? ' '.repeat(depth * 3) + '↳ ' : '';
-
+          const indent = depth > 0 ? '   '.repeat(depth) + '↳ ' : '';
           const md = stockMarketData[pId] || null;
 
-          exportData.push({
-            'ID Cadena': roots[0]?.id.substring(0, 13) || node.id.substring(0, 13),
-            'Fecha': node.date,
-            'Operacion': node.operation_type.toUpperCase(),
-            'Comprador/Vendedor': node.buyer,
-            'Vehículo': indent + (principal?.description || 'N/A'),
-            'Principal': node.total_amount,
-            'Chapa': principal?.chapa || 'N/A',
-            'Chasis': principal?.chasis || 'N/A',
-            'Parte de Pago': tradeIns.reduce((sum, v) => sum + (v.valuation || 0), 0),
-            'Vehículos en Parte de Pago': tradeIns.map(v => `${v.description} (CHAPA: ${v.chapa || 'S/C'})`).join(' | '),
-            'su valor': node.total_amount,
-            'Costo Inversión (Origen)': roots[0]?.total_amount || 0,
-            'clasipar': md ? md.clasipar : '',
-            'Marketplace': md ? md.marketplace : '',
-            'Instagram': md ? md.instagram : '',
-            'Internet': md ? md.internet : '',
-            'Precio Promedio del mercado': md ? md.promedio : '',
-            '# Comparativa': md ? md.diffDollar : '',
-            '% Comparativa': md ? `${md.diffPercent}%` : '',
-            'Estado Datos': md ? (md.isRealData ? 'REAL' : 'ESTIMADO') : 'PENDIENTE'
+          const mainRow = sheet.addRow({
+            chain_id: chainId,
+            date: node.date,
+            operation: nodeType.toUpperCase(),
+            buyer: node.buyer || '',
+            vehicle: indent + (principal?.description || 'N/A'),
+            chapa: principal?.chapa || 'N/A',
+            chasis: principal?.chasis || 'N/A',
+            amount: node.total_amount || 0,
+            amount_type: 'TOTAL OPERACIÓN',
+            stock_status: '',
+            invest_cost: investCost,
+            clasipar:    md ? (md.clasipar    || '') : '',
+            marketplace: md ? (md.marketplace || '') : '',
+            instagram:   md ? (md.instagram   || '') : '',
+            market_avg:  md ? (md.promedio    || '') : '',
+            diff_dollar: md ? (md.diffDollar  || '') : '',
+            diff_pct:    md ? `${md.diffPercent}%`  : '',
+            real_data:   md ? (md.isRealData ? 'REAL' : 'ESTIMADO') : 'PENDIENTE',
+          });
+          mainRow.height = 20;
+
+          if (nodeType === 'compra') {
+            fillRow(mainRow, 'FF0c2418');
+            mainRow.getCell('operation').font = { bold: true, color: { argb: 'FF10b981' }, size: 10 };
+          } else if (nodeType === 'venta') {
+            fillRow(mainRow, 'FF260a0a');
+            mainRow.getCell('operation').font = { bold: true, color: { argb: 'FFef4444' }, size: 10 };
+          } else {
+            fillRow(mainRow, 'FF1a1b23');
+            mainRow.getCell('operation').font = { bold: true, color: { argb: 'FFfbbf24' }, size: 10 };
+          }
+
+          // Una fila por cada vehículo entregado como parte de pago
+          tradeIns.forEach(t => {
+            const tId = (t.chasis || t.chapa || '').trim().toUpperCase();
+            const inStock = tId ? stockSet.has(tId) : false;
+            const statusColor = inStock ? 'FF10b981' : 'FFef4444';
+            const bgColor = inStock ? 'FF0a1f12' : 'FF1f0a0a';
+
+            const trRow = sheet.addRow({
+              chain_id:     '',
+              date:         '',
+              operation:    'PARTE DE PAGO',
+              buyer:        '',
+              vehicle:      '   └─ ' + (t.description || 'N/A'),
+              chapa:        t.chapa  || 'N/A',
+              chasis:       t.chasis || 'N/A',
+              amount:       t.valuation || 0,
+              amount_type:  'VALOR ENTREGADO',
+              stock_status: inStock ? '✔ EN STOCK' : '✘ VENDIDO',
+              invest_cost:  '',
+              clasipar: '', marketplace: '', instagram: '',
+              market_avg: '', diff_dollar: '', diff_pct: '', real_data: '',
+            });
+            trRow.height = 18;
+            fillRow(trRow, bgColor);
+            trRow.getCell('operation').font   = { italic: true, color: { argb: 'FF6b7280' }, size: 9 };
+            trRow.getCell('vehicle').font     = { color: { argb: statusColor }, size: 10 };
+            trRow.getCell('amount').font      = { bold: true, color: { argb: statusColor }, size: 10 };
+            trRow.getCell('stock_status').font = { bold: true, color: { argb: statusColor }, size: 10 };
           });
 
           const children = fullChain.filter(o => {
-              if (processedIds.has(o.id)) return false;
-              
-              // Link A: Explicit manually linked via UI
-              if (o.parentId === node.id) return true;
-              
-              // Link B: Compra (Same Car) -> Venta (Same Car)
-              if (nodeType === 'compra' && pId) {
-                  const isVentaOfSameCar = o.operation_type.toLowerCase() === 'venta' && 
-                                           (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId);
-                  if (isVentaOfSameCar) return true;
-              }
-
-              // Link C: Venta (Principal) -> Compra (of a trade-in vehicle)
-              if (nodeType === 'venta') {
-                  const isCompraOfTradeIn = o.operation_type.toLowerCase() === 'compra' && 
-                                            (o.vehicles || []).some(v => v.role === 'principal' && tradeIns.some(t => getVehId(t) === getVehId(v)));
-                  if (isCompraOfTradeIn) return true;
-              }
-
-              return false;
+            if (processedIds.has(o.id)) return false;
+            if (o.parentId === node.id) return true;
+            if (nodeType === 'compra' && pId) {
+              if (o.operation_type.toLowerCase() === 'venta' &&
+                  (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId)) return true;
+            }
+            if (nodeType === 'venta') {
+              if (o.operation_type.toLowerCase() === 'compra' &&
+                  (o.vehicles || []).some(v => v.role === 'principal' && tradeIns.some(t => getVehId(t) === getVehId(v)))) return true;
+            }
+            return false;
           });
-
           children.sort((a, b) => parseDate(a.date) - parseDate(b.date));
-          children.forEach(c => pushToExport(c, depth + 1));
+          children.forEach(c => pushToSheet(c, depth + 1));
         };
 
-        roots.forEach(r => pushToExport(r, 0));
-        if (fullChain.length > 0) exportData.push({});
+        roots.forEach(r => pushToSheet(r, 0));
+        const sepRow = sheet.addRow({});
+        fillRow(sepRow, 'FF050507');
+        sepRow.height = 6;
       });
 
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte Filtrado");
-      
-      const wscols = [
-        {wch: 12}, {wch: 12}, {wch: 15}, {wch: 30}, {wch: 30}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 15}, {wch: 40}, {wch: 15}, {wch: 22}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 25}, {wch: 25}
-      ];
-      worksheet['!cols'] = wscols;
-
-      const fileName = searchQuery ? `Reporte_${searchQuery}_${period}.xlsx` : `Reporte_Filtrado_${period}.xlsx`;
-      XLSX.writeFile(workbook, fileName);
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = searchQuery ? `Reporte_${searchQuery}_${period}.xlsx` : `Reporte_Filtrado_${period}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error al exportar Excel:", error);
       alert("Hubo un error al generar el archivo Excel. Por favor, revisa la consola para más detalles.");
