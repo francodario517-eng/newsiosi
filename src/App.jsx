@@ -50,20 +50,10 @@ function App() {
   const [editingOperation, setEditingOperation] = useState(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [realtimeStatus, setRealtimeStatus] = useState('CONNECTING') // 'CONNECTED' | 'ERROR' | 'DISCONNECTED' | 'CONNECTING'
-  const [stockMarketData, setStockMarketData] = useState(() => {
-    try {
-      const saved = localStorage.getItem('stockMarketData');
-      return saved ? JSON.parse(saved) : {};
-    } catch (e) {
-      console.error("Error loading stockMarketData from localStorage:", e);
-      return {};
-    }
-  });
-
-  // Persist market data changes to localStorage
-  useEffect(() => {
-    localStorage.setItem('stockMarketData', JSON.stringify(stockMarketData));
-  }, [stockMarketData]);
+  // IMPORTANTE: stockMarketData NO se inicializa desde localStorage.
+  // Los datos de mercado viven en Supabase (campo market_data de vehicles).
+  // Usar localStorage causaba que distintos dispositivos vieran datos diferentes.
+  const [stockMarketData, setStockMarketData] = useState({});
 
   const [isUpdatingMarket, setIsUpdatingMarket] = useState(false);
   const [marketUpdateProgress, setMarketUpdateProgress] = useState({ current: 0, total: 0 });
@@ -262,7 +252,9 @@ function App() {
   }, [stockVehicles.length > 0]);
 
   // Market data persisted in localStorage — survives page refreshes
-  // Auto-load market data from loaded vehicles
+  // Auto-load market data desde Supabase (campo market_data en vehicles).
+  // La DB es la fuente de verdad — sus datos siempre ganan sobre cualquier
+  // cache local para garantizar consistencia entre dispositivos.
   useEffect(() => {
     const newMarketData = {};
     operations.forEach(op => {
@@ -275,8 +267,20 @@ function App() {
         }
       });
     });
-    setStockMarketData(prev => ({ ...newMarketData, ...prev }));
+    // DB gana sobre cache local: comparamos timestamps y nos quedamos con el más reciente
+    setStockMarketData(prev => {
+      const merged = { ...prev };
+      Object.entries(newMarketData).forEach(([key, dbData]) => {
+        const localData = prev[key];
+        // Usar datos de DB si: no hay datos locales, o si los de DB son más recientes
+        if (!localData || !localData.updatedAtISO || (dbData.updatedAtISO && dbData.updatedAtISO >= localData.updatedAtISO)) {
+          merged[key] = dbData;
+        }
+      });
+      return merged;
+    });
   }, [operations]);
+
 
   
   // Money formatting helpers
