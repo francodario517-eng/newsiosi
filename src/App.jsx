@@ -695,6 +695,7 @@ function App() {
           const tradeIns = node.vehicles?.filter(v => v.role === 'parte_pago') || [];
           const indent = depth > 0 ? '   '.repeat(depth) + '↳ ' : '';
           const md = stockMarketData[pId] || null;
+          const mainInStock = pId ? stockSet.has(pId) : false;
 
           const mainRow = sheet.addRow({
             chain_id: chainId,
@@ -706,7 +707,7 @@ function App() {
             chasis: principal?.chasis || 'N/A',
             amount: node.total_amount || 0,
             amount_type: 'TOTAL OPERACIÓN',
-            stock_status: '',
+            stock_status: pId ? (mainInStock ? '✔ EN STOCK' : '✘ VENDIDO') : '',
             invest_cost: investCost,
             clasipar:    md ? (md.clasipar    || '') : '',
             marketplace: md ? (md.marketplace || '') : '',
@@ -727,6 +728,13 @@ function App() {
           } else {
             fillRow(mainRow, 'FFf0eeff');
             mainRow.getCell('operation').font = { bold: true, color: { argb: 'FF5a3fa0' }, size: 10 };
+          }
+          if (pId) {
+            mainRow.getCell('stock_status').font = {
+              bold: true,
+              color: { argb: mainInStock ? 'FF1a6b45' : 'FF9b2020' },
+              size: 10
+            };
           }
 
           // Una fila por cada vehículo entregado como parte de pago
