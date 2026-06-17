@@ -603,9 +603,34 @@ function App() {
         cell.border = { bottom: { style: 'medium', color: { argb: 'FFaa3bff' } } };
       });
 
-      const stockSet = new Set(
-        stockVehicles.map(v => (v.chasis || v.chapa || '').trim().toUpperCase()).filter(Boolean)
-      );
+      // Compute stockSet self-contained from all operations (mirrors stockVehicles logic)
+      // Any non-venta operation (compra, rescisión, importación, remate, recuperado de secuestro, etc.)
+      // whose principal vehicle has more entries than exits is considered "in stock".
+      const _entryMap = new Map();
+      const _exitCounts = new Map();
+      operations.forEach(op => {
+        const t = (op.operation_type || '').toLowerCase();
+        const isV = t === 'venta';
+        const isCom = t === 'compra';
+        op.vehicles?.forEach(v => {
+          if (!v) return;
+          const id = (v.chasis || v.chapa || '').trim().toUpperCase();
+          if (!id) return;
+          // Exits: venta principal, or compra parte_pago
+          if ((isV && v.role === 'principal') || (isCom && v.role === 'parte_pago')) {
+            _exitCounts.set(id, (_exitCounts.get(id) || 0) + 1);
+          }
+          // Entries: any non-venta principal, or venta parte_pago
+          if ((!isV && v.role === 'principal') || (isV && v.role === 'parte_pago')) {
+            if (!_entryMap.has(id)) _entryMap.set(id, 0);
+            _entryMap.set(id, _entryMap.get(id) + 1);
+          }
+        });
+      });
+      const stockSet = new Set();
+      _entryMap.forEach((entries, id) => {
+        if (entries > (_exitCounts.get(id) || 0)) stockSet.add(id);
+      });
 
       const fillRow = (row, argb) => {
         row.eachCell({ includeEmpty: true }, cell => {
