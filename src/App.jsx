@@ -585,6 +585,7 @@ function App() {
         { header: 'Tipo Monto',          key: 'amount_type',  width: 22 },
         { header: 'Estado Stock',        key: 'stock_status', width: 14 },
         { header: 'Costo Inversión',     key: 'invest_cost',  width: 16 },
+        { header: 'Ganancia Est. USD',   key: 'profit_est',   width: 18 },
         { header: 'Clasipar USD',        key: 'clasipar',     width: 13 },
         { header: 'Marketplace USD',     key: 'marketplace',  width: 15 },
         { header: 'Instagram USD',       key: 'instagram',    width: 13 },
@@ -711,6 +712,15 @@ function App() {
         const chainId = roots[0]?.id.substring(0, 13) || op.id.substring(0, 13);
         const investCost = roots[0]?.total_amount || 0;
 
+        let chainRevenue = 0;
+        let chainInvestment = 0;
+        fullChain.forEach(node => {
+          const amt = Number(node.total_amount) || 0;
+          if (node.operation_type.toLowerCase() === 'venta') chainRevenue += amt;
+          else if (node.operation_type.toLowerCase() === 'compra') chainInvestment += amt;
+        });
+        const chainProfit = chainRevenue - chainInvestment;
+
         const pushToSheet = (node, depth = 0) => {
           if (processedIds.has(node.id)) return;
           processedIds.add(node.id);
@@ -735,6 +745,7 @@ function App() {
             amount_type: 'TOTAL OPERACIÓN',
             stock_status: pId ? (mainInStock ? '✔ EN STOCK' : '✘ VENDIDO') : '',
             invest_cost: investCost,
+            profit_est: chainProfit,
             clasipar:    md ? (md.clasipar    || '') : '',
             marketplace: md ? (md.marketplace || '') : '',
             instagram:   md ? (md.instagram   || '') : '',
@@ -782,6 +793,7 @@ function App() {
               amount_type:  'VALOR ENTREGADO',
               stock_status: inStock ? '✔ EN STOCK' : '✘ VENDIDO',
               invest_cost:  '',
+              profit_est:   '',
               clasipar: '', marketplace: '', instagram: '',
               market_avg: '', diff_dollar: '', diff_pct: '', real_data: '',
             });
