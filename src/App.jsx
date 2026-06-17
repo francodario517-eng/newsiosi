@@ -66,7 +66,8 @@ function App() {
       const type = (op.operation_type || '').toLowerCase();
       const isVenta = type === 'venta';
       const isCompra = type === 'compra';
-      const isRescision = type === 'rescisión';
+      // Any non-venta operation (compra, rescisión, remate, importación, recuperado de secuestro, etc.)
+      const isEntry = !isVenta;
 
       // Record Exits
       op.vehicles?.forEach(v => {
@@ -82,10 +83,10 @@ function App() {
         }
       });
 
-      // Record Entries
+      // Record Entries: any non-venta operation adds the principal vehicle to stock
       op.vehicles?.forEach(v => {
         if (!v) return;
-        const isPrincipalEntry = (isCompra || isRescision) && v.role === 'principal';
+        const isPrincipalEntry = isEntry && v.role === 'principal';
         const isTradeInEntry = isVenta && v.role === 'parte_pago';
         
         if (isPrincipalEntry || isTradeInEntry) {
@@ -99,7 +100,7 @@ function App() {
               chasis: v.chasis,
               valuation: v.role === 'principal' ? (op.total_amount || 0) : (v.valuation || 0),
               entry_date: op.date,
-              source_type: isPrincipalEntry ? (isRescision ? 'RESCISIÓN' : 'COMPRA') : 'PARTE PAGO RECIBIDO',
+              source_type: isPrincipalEntry ? type.toUpperCase() : 'PARTE PAGO RECIBIDO',
               operation_id: op.id
             });
           }
