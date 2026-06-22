@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { ShoppingCart, Calendar, RefreshCw, Loader, TrendingUp, TrendingDown, DollarSign, Globe, Check, AlertTriangle, ShieldCheck, ShieldAlert, GitBranch } from 'lucide-react';
-import { apifyService } from '../services/apify';
+import React from 'react';
+import { ShoppingCart, Calendar, TrendingUp, TrendingDown, DollarSign, Globe, Loader, GitBranch } from 'lucide-react';
 import { db, supabase } from '../services/db';
 
 export function StockTable({
@@ -8,55 +7,10 @@ export function StockTable({
   onSellVehicle,
   onViewTree,
   marketData,
-  setMarketData,
-  isUpdatingAll,
-  updateProgress,
-  onUpdateAll
+  setMarketData
 }) {
-  const [lastGlobalUpdate, setLastGlobalUpdate] = useState(null);
-  const [showSuccessCheck, setShowSuccessCheck] = useState(false);
-  const [apifyEnabled, setApifyEnabled] = useState(() => localStorage.getItem('APIFY_ENABLED') === 'true');
-
-  const toggleApify = () => {
-    const newValue = !apifyEnabled;
-    setApifyEnabled(newValue);
-    localStorage.setItem('APIFY_ENABLED', newValue.toString());
-  };
-
-  const getTimeAgo = (date) => {
-    if (!date) return null;
-    const seconds = Math.floor((new Date() - date) / 1000);
-    
-    let interval = seconds / 31536000;
-    if (interval > 1) return `hace ${Math.floor(interval)} años`;
-    interval = seconds / 2592000;
-    if (interval > 1) return `hace ${Math.floor(interval)} meses`;
-    interval = seconds / 86400;
-    if (interval > 1) return `hace ${Math.floor(interval)} días`;
-    interval = seconds / 3600;
-    if (interval > 1) return `hace ${Math.floor(interval)} horas`;
-    interval = seconds / 60;
-    if (interval > 1) return `hace ${Math.floor(interval)} minutos`;
-    return 'hace instantes';
-  };
-
   const formatMoney = (val) => {
     return new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(val);
-  };
-
-  const handleUpdateAll = async () => {
-    if (lastGlobalUpdate) {
-      const timeAgo = getTimeAgo(lastGlobalUpdate);
-      const confirmMsg = `Se ha actualizado ${timeAgo}. ¿Estás seguro de que quieres volver a realizar la búsqueda de los ${stock.length} vehículos?`;
-      if (!window.confirm(confirmMsg)) return;
-    }
-
-    if (onUpdateAll) {
-      await onUpdateAll();
-      setLastGlobalUpdate(new Date());
-      setShowSuccessCheck(true);
-      setTimeout(() => setShowSuccessCheck(false), 5000);
-    }
   };
 
   return (
@@ -79,107 +33,6 @@ export function StockTable({
             <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>
               {stock.length} unidades en stock. Análisis de precios online.
             </p>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {/* Apify Toggle */}
-          <div 
-            onClick={toggleApify}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              background: apifyEnabled ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              padding: '6px 12px',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              border: `1px solid ${apifyEnabled ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-              transition: 'all 0.3s ease'
-            }}
-            title={apifyEnabled ? "Búsqueda REAL activa (Consume créditos)" : "Búsqueda SIMULADA activa (Gratis)"}
-          >
-            {apifyEnabled ? <ShieldCheck size={16} color="#10b981" /> : <ShieldAlert size={16} color="#ef4444" />}
-            <span style={{ fontSize: '12px', fontWeight: 'bold', color: apifyEnabled ? '#10b981' : '#ef4444' }}>
-              Apify: {apifyEnabled ? 'REAL' : 'OFF'}
-            </span>
-            <div style={{ 
-              width: '24px', 
-              height: '12px', 
-              background: apifyEnabled ? '#10b981' : '#4b5563', 
-              borderRadius: '10px',
-              position: 'relative',
-              transition: 'all 0.3s'
-            }}>
-              <div style={{ 
-                position: 'absolute', 
-                left: apifyEnabled ? '13px' : '2px', 
-                top: '2px', 
-                width: '8px', 
-                height: '8px', 
-                background: 'white', 
-                borderRadius: '50%',
-                transition: 'all 0.3s'
-              }} />
-            </div>
-          </div>
-
-          <div style={{ position: 'relative' }}>
-            {apifyEnabled && !isUpdatingAll && !showSuccessCheck && (
-              <div style={{ 
-                position: 'absolute', 
-                top: '-35px', 
-                right: '0', 
-                whiteSpace: 'nowrap',
-                background: '#f59e0b',
-                color: 'black',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                zIndex: 10
-              }}>
-                <AlertTriangle size={12} /> CUESTA CRÉDITOS
-              </div>
-            )}
-            <button 
-              className="btn" 
-              onClick={handleUpdateAll} 
-              disabled={isUpdatingAll || stock.length === 0}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                background: showSuccessCheck ? '#10b981' : isUpdatingAll ? 'rgba(255,255,255,0.05)' : 'transparent',
-                borderColor: showSuccessCheck ? '#10b981' : isUpdatingAll ? 'rgba(255,255,255,0.1)' : 'var(--primary)',
-                color: showSuccessCheck ? 'white' : isUpdatingAll ? 'var(--text-muted)' : 'var(--primary)',
-                border: '1px solid',
-                padding: '10px 20px',
-                borderRadius: '10px',
-                cursor: isUpdatingAll ? 'not-allowed' : 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {showSuccessCheck ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ background: 'white', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Check size={14} color="#10b981" strokeWidth={3} />
-                  </div>
-                  <span>¡Valores Actualizados!</span>
-                </div>
-              ) : (
-                <>
-                  {isUpdatingAll ? <Loader size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                  {isUpdatingAll 
-                    ? `Actualizando (${updateProgress.current}/${updateProgress.total})...` 
-                    : 'Actualizar Valores de Mercado'}
-                </>
-              )}
-            </button>
           </div>
         </div>
       </div>

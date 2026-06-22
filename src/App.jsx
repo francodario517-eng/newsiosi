@@ -1289,9 +1289,6 @@ function App() {
                 onViewTree={handleViewTreeFromStock}
                 marketData={stockMarketData}
                 setMarketData={setStockMarketData}
-                isUpdatingAll={isUpdatingMarket}
-                updateProgress={marketUpdateProgress}
-                onUpdateAll={handleUpdateMarket}
               />
             </div>
           )}
@@ -1351,7 +1348,7 @@ function App() {
             </div>
 
             <form key={editingOperation?.id || preFilledData?.operation_id || 'new'} onSubmit={handleSaveOperation}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div>
                   <label>Tipo</label>
                   <select 
@@ -1380,20 +1377,20 @@ function App() {
                 </div>
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div>
                   <label>Fecha</label>
-                  <input 
-                    name="date" 
-                    type="date" 
-                    required 
+                  <input
+                    name="date"
+                    type="date"
+                    required
                     defaultValue={
                       editingOperation ? (editingOperation.date.includes('/') ? editingOperation.date.split('/').reverse().join('-') : editingOperation.date) :
                       (preFilledData?.date || new Date().toISOString().split('T')[0])
-                    } 
+                    }
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-grid-2-nested">
                   <div><label>Chapa</label><input name="chapa" defaultValue={editingOperation?.vehicles?.[0]?.chapa || preFilledData?.chapa || ''} /></div>
                   <div><label>Chasis</label><input name="chasis" defaultValue={editingOperation?.vehicles?.[0]?.chasis || preFilledData?.chasis || ''} /></div>
                 </div>
@@ -1405,7 +1402,7 @@ function App() {
               <label>Comprador / Vendedor</label>
               <input name="buyer" defaultValue={editingOperation?.buyer || preFilledData?.buyer || ''} placeholder="Nombre completo" />
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '16px' }}>
+              <div className="form-grid-3" style={{ marginTop: '16px' }}>
                  <div><label>Entrega Contado</label><input name="delivery_amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(editingOperation?.delivery_amount || preFilledData?.delivery_amount || 0)} placeholder="0" /></div>
                  <div><label>Cuotas</label><input name="installments" type="number" defaultValue={editingOperation?.installments || preFilledData?.installments || 0} placeholder="0" /></div>
                  <div><label>Monto Crédito</label><input name="credit_amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(editingOperation?.credit_amount || preFilledData?.credit_amount || 0)} placeholder="0" /></div>
