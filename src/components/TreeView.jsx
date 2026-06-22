@@ -1,7 +1,22 @@
-import React, { useMemo } from 'react';
-import ReactFlow, { Background, Controls, MiniMap, Handle, Position, ReactFlowProvider } from 'reactflow';
+import React, { useMemo, useEffect } from 'react';
+import ReactFlow, { Background, Controls, MiniMap, Handle, Position, ReactFlowProvider, useReactFlow } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { PlusCircle, Edit2, Pencil, Trash2 } from 'lucide-react';
+
+// Reintenta el fitView un poco después del montaje: si el contenedor todavía
+// no tenía su tamaño final cuando ReactFlow calculó el fitView inicial
+// (animaciones/layout en curso), esto corrige la vista sin que el usuario
+// tenga que cambiar de pestaña y volver.
+const AutoFit = ({ nodes }) => {
+  const { fitView } = useReactFlow();
+  useEffect(() => {
+    if (!nodes || nodes.length === 0) return;
+    const t1 = setTimeout(() => fitView({ padding: 0.3, duration: 0 }), 50);
+    const t2 = setTimeout(() => fitView({ padding: 0.3, duration: 0 }), 300);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [nodes, fitView]);
+  return null;
+};
 
 // Custom Node for a 1:1 match with the user's detailed example
 const VehicleNode = ({ data }) => {
@@ -261,6 +276,7 @@ export function TreeView({ data, onAddBranch, onEditOperation, onDeleteOperation
           >
             <Background color="rgba(170, 59, 255, 0.25)" gap={22} variant="dots" />
             <Controls />
+            <AutoFit nodes={styledNodes} />
           </ReactFlow>
         </ReactFlowProvider>
       )}
