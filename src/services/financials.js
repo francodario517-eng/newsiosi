@@ -15,20 +15,27 @@ export const financials = {
     let totalRevenue = 0;
     let totalInvestment = 0;
     let tradeInCount = 0;
+    let tradeInCost = 0; // Costo de adquisición de vehículos recibidos como parte de pago
 
     nodes.forEach(node => {
       const { operation_type, total_amount, trade_ins } = node.data;
       const amount = Number(total_amount) || 0;
-      
+
       if (operation_type === 'venta') {
         totalRevenue += amount;
-        if (trade_ins) tradeInCount += trade_ins.length;
+        if (trade_ins) {
+          tradeInCount += trade_ins.length;
+          // Cada vehículo recibido como parte de pago tiene un costo (su valuación).
+          // Si luego se revende, esa venta ya está sumada en totalRevenue, así que
+          // hay que restar el costo de entrada para no duplicar la ganancia.
+          trade_ins.forEach(t => { tradeInCost += Number(t.amount) || 0; });
+        }
       } else if (operation_type === 'compra') {
         totalInvestment += amount;
       }
     });
 
-    const totalProfit = totalRevenue - totalInvestment;
+    const totalProfit = totalRevenue - totalInvestment - tradeInCost;
     return {
       totalProfit,
       totalInvestment,
