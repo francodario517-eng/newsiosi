@@ -220,7 +220,13 @@ export function TreeView({ data, onAddBranch, onEditOperation, onDeleteOperation
   })), [nodes, onAddBranch, onEditOperation, onDeleteOperation, highlightedId]);
 
   return (
-    <div style={{ width: '100%', height: '800px', background: '#0a0b10', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
+    <div style={{
+      width: '100%', height: '800px',
+      background: 'radial-gradient(circle at 50% 0%, #1a1330 0%, #120c22 55%, #0d0a18 100%)',
+      borderRadius: '12px', overflow: 'hidden', position: 'relative',
+      border: '1px solid rgba(170, 59, 255, 0.25)',
+      boxShadow: 'inset 0 0 60px rgba(170, 59, 255, 0.06)'
+    }}>
       {isLoading ? (
         <div className="loader-container">
           <div className="pulse-loader"></div>
@@ -237,7 +243,7 @@ export function TreeView({ data, onAddBranch, onEditOperation, onDeleteOperation
             fitViewOptions={{ padding: 0.3 }}
             style={{ background: 'transparent' }}
           >
-            <Background color="#333" gap={20} variant="dots" />
+            <Background color="rgba(170, 59, 255, 0.25)" gap={22} variant="dots" />
             <Controls />
           </ReactFlow>
         </ReactFlowProvider>
