@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect } from 'react';
 import ReactFlow, { Background, Controls, MiniMap, Handle, Position, ReactFlowProvider, useReactFlow } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { PlusCircle, Edit2, Pencil, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit2, Pencil, Trash2, ArrowRightLeft } from 'lucide-react';
 
 // Reintenta el fitView un poco después del montaje: si el contenedor todavía
 // no tenía su tamaño final cuando ReactFlow calculó el fitView inicial
@@ -124,7 +124,7 @@ const VehicleNode = ({ data }) => {
             {data.vehicle_description}
           </a>
           {!data.isPrincipalSold && (
-            <button 
+            <button
               onClick={(e) => {
                 e.stopPropagation();
                 if (data.onAddBranch) data.onAddBranch({
@@ -134,16 +134,38 @@ const VehicleNode = ({ data }) => {
                   operation_id: data.operation_id
                 });
               }}
-              title={data.onAddBranch ? "Crear rama desde este vehículo" : "No tienes permisos para agregar"}
-              style={{ 
-                background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              title={data.onAddBranch ? "Crear rama desde este vehículo (Venta)" : "No tienes permisos para agregar"}
+              style={{
+                background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: data.onAddBranch ? 'pointer' : 'not-allowed',
                 opacity: data.onAddBranch ? 1 : 0.3,
                 padding: 0, color: 'white', flexShrink: 0
               }}
             >
               <PlusCircle size={12} />
+            </button>
+          )}
+          {!data.isPrincipalSold && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (data.onUseAsTradeIn) data.onUseAsTradeIn({
+                  description: data.vehicle_description,
+                  chapa: data.chapa,
+                  chasis: data.chasis,
+                });
+              }}
+              title={data.onUseAsTradeIn ? "Usar este vehículo como parte de pago en una nueva Compra" : "No tienes permisos para agregar"}
+              style={{
+                background: '#06b6d4', border: 'none', borderRadius: '50%', width: '18px', height: '18px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: data.onUseAsTradeIn ? 'pointer' : 'not-allowed',
+                opacity: data.onUseAsTradeIn ? 1 : 0.3,
+                padding: 0, color: 'white', flexShrink: 0
+              }}
+            >
+              <ArrowRightLeft size={11} />
             </button>
           )}
         </div>
@@ -196,7 +218,7 @@ const VehicleNode = ({ data }) => {
                       operation_id: data.operation_id
                     });
                   }}
-                  title={data.onAddBranch ? "Crear rama desde este vehículo" : "No tienes permisos para agregar"}
+                  title={data.onAddBranch ? "Crear rama desde este vehículo (Venta)" : "No tienes permisos para agregar"}
                   style={{
                     background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -206,6 +228,28 @@ const VehicleNode = ({ data }) => {
                   }}
                 >
                   <PlusCircle size={12} />
+                </button>
+              )}
+              {(!t.isExit && !t.isSold) && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (data.onUseAsTradeIn) data.onUseAsTradeIn({
+                      description: t.description,
+                      chapa: t.chapa,
+                      chasis: t.chasis,
+                    });
+                  }}
+                  title={data.onUseAsTradeIn ? "Usar este vehículo como parte de pago en una nueva Compra" : "No tienes permisos para agregar"}
+                  style={{
+                    background: '#06b6d4', border: 'none', borderRadius: '50%', width: '18px', height: '18px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: data.onUseAsTradeIn ? 'pointer' : 'not-allowed',
+                    opacity: data.onUseAsTradeIn ? 1 : 0.3,
+                    padding: 0, color: 'white', flexShrink: 0
+                  }}
+                >
+                  <ArrowRightLeft size={11} />
                 </button>
               )}
               {t.isExit && (
@@ -235,20 +279,21 @@ const nodeTypes = {
 
 
 
-export function TreeView({ data, onAddBranch, onEditOperation, onDeleteOperation, highlightedId, isLoading }) {
+export function TreeView({ data, onAddBranch, onUseAsTradeIn, onEditOperation, onDeleteOperation, highlightedId, isLoading }) {
   const { nodes, edges } = data || { nodes: [], edges: [] };
 
   const styledNodes = useMemo(() => nodes.map(node => ({
     ...node,
     type: 'vehicle',
-    data: { 
+    data: {
       ...node.data,
       onAddBranch,
+      onUseAsTradeIn,
       onEditOperation,
       onDeleteOperation,
       isHighlighted: node.data.operation_id === highlightedId
     }
-  })), [nodes, onAddBranch, onEditOperation, onDeleteOperation, highlightedId]);
+  })), [nodes, onAddBranch, onUseAsTradeIn, onEditOperation, onDeleteOperation, highlightedId]);
 
   return (
     <div style={{

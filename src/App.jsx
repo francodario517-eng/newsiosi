@@ -444,6 +444,22 @@ function App() {
     setShowModal(true);
   }
 
+  // Tomar un vehículo que ya está en stock y entregarlo como parte de pago
+  // dentro de una NUEVA Compra. El vehículo nuevo (el que se está adquiriendo)
+  // se completa manualmente como principal; este vehículo queda precargado
+  // como parte de pago.
+  const handleUseAsTradeIn = (vehicleInfo) => {
+    setPreFilledData({ type: 'Compra' });
+    setEditingOperation(null);
+    setTradeInVehicles([{
+      description: vehicleInfo.description || '',
+      chapa: vehicleInfo.chapa || '',
+      chasis: vehicleInfo.chasis || '',
+      valuation: ''
+    }]);
+    setShowModal(true);
+  }
+
   const handleEditOperation = (op) => {
     setEditingOperation(op);
     let dateInput = op.date;
@@ -1264,9 +1280,10 @@ function App() {
                   />
                  </div>
                ) : (
-                 <TreeView 
-                   data={selectedTraceability} 
-                   onAddBranch={userProfile?.can_edit ? handleOpenBranchModal : null} 
+                 <TreeView
+                   data={selectedTraceability}
+                   onAddBranch={userProfile?.can_edit ? handleOpenBranchModal : null}
+                   onUseAsTradeIn={userProfile?.can_edit ? handleUseAsTradeIn : null}
                    onEditOperation={userProfile?.can_edit ? handleEditOperation : null}
                    onDeleteOperation={userProfile?.can_delete ? handleDeleteOperation : null}
                    highlightedId={highlightedId}
