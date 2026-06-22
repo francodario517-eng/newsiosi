@@ -14,8 +14,16 @@ export const financials = {
       return { totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0, unsoldTradeInValue: 0, unsoldTradeInCount: 0 };
     }
 
+    // Convierte la fecha ya formateada del nodo (es-PY, ej "18/6/2026") a Date
+    const parseNodeDate = (d) => {
+      if (!d) return new Date(0);
+      const parts = d.split('/').map(Number);
+      if (parts.length === 3) return new Date(parts[2], parts[1] - 1, parts[0]);
+      const parsed = new Date(d);
+      return isNaN(parsed.getTime()) ? new Date(0) : parsed;
+    };
+
     let totalRevenue = 0;
-    let totalInvestment = 0;
     let tradeInCount = 0;
     let unsoldTradeInValue = 0; // Valor acumulado de partes de pago aún no revendidas
     let unsoldTradeInCount = 0;
@@ -35,10 +43,20 @@ export const financials = {
             }
           });
         }
-      } else if (operation_type === 'compra') {
-        totalInvestment += amount;
       }
     });
+
+    // La Inversión Inicial es el costo de la COMPRA más antigua de la cadena
+    // (la entrada real de capital). Las compras posteriores que se pagan
+    // entregando un vehículo ya comprado antes NO se suman aparte, porque
+    // ese costo ya está contado en la compra original — sumarlas de nuevo
+    // duplicaría el monto.
+    const compraNodes = nodes.filter(n => n.data.operation_type === 'compra');
+    const totalInvestment = compraNodes.length > 0
+      ? Number(compraNodes.reduce((oldest, n) =>
+          parseNodeDate(n.data.date) < parseNodeDate(oldest.data.date) ? n : oldest
+        ).data.total_amount) || 0
+      : 0;
 
     const totalProfit = totalRevenue - totalInvestment;
     return {
