@@ -52,13 +52,41 @@ export const financials = {
     // ese costo ya está contado en la compra original — sumarlas de nuevo
     // duplicaría el monto.
     const compraNodes = nodes.filter(n => n.data.operation_type === 'compra');
+    const ventaNodes = nodes.filter(n => n.data.operation_type === 'venta');
     const totalInvestment = compraNodes.length > 0
       ? Number(compraNodes.reduce((oldest, n) =>
           parseNodeDate(n.data.date) < parseNodeDate(oldest.data.date) ? n : oldest
         ).data.total_amount) || 0
       : 0;
 
-    const totalProfit = totalRevenue - totalInvestment;
+    // Valor del vehículo que hoy seguís teniendo en mano (ganancia "en papel"
+    // aunque todavía no se vendió): la compra cuyo vehículo NO fue entregado
+    // como parte de pago en otra compra, ni vendido en una venta.
+    const getVehKey = (chasis, chapa) => (chasis || chapa || '').trim().toUpperCase();
+
+    const givenAwayIds = new Set();
+    compraNodes.forEach(n => {
+      (n.data.trade_ins || []).forEach(t => {
+        const key = getVehKey(t.chasis, t.chapa);
+        if (key) givenAwayIds.add(key);
+      });
+    });
+
+    const soldIds = new Set();
+    ventaNodes.forEach(n => {
+      const key = getVehKey(n.data.chasis, n.data.chapa);
+      if (key) soldIds.add(key);
+    });
+
+    let currentHoldingValue = 0;
+    compraNodes.forEach(n => {
+      const key = getVehKey(n.data.chasis, n.data.chapa);
+      if (key && !givenAwayIds.has(key) && !soldIds.has(key)) {
+        currentHoldingValue += Number(n.data.total_amount) || 0;
+      }
+    });
+
+    const totalProfit = totalRevenue + currentHoldingValue - totalInvestment;
     return {
       totalProfit,
       totalInvestment,
@@ -66,6 +94,7 @@ export const financials = {
       tradeInCount,
       unsoldTradeInValue,
       unsoldTradeInCount,
+      currentHoldingValue,
       status: totalProfit >= 0 ? 'ganancia' : 'perdida'
     };
   },
