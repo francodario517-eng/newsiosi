@@ -147,46 +147,62 @@ const VehicleNode = ({ data }) => {
         <div>Monto Credito {data.credit_amount?.toLocaleString()}</div>
       </div>
 
-      {data.trade_ins && data.trade_ins.filter(Boolean).length > 0 && data.trade_ins.filter(Boolean).map((t, idx) => (
-        <div key={idx} style={{ marginTop: '16px', borderTop: idx > 0 ? '1px dashed #333' : 'none', paddingTop: idx > 0 ? '12px' : '0' }}>
-          <div>A- Vehiculo Entregado como Parte de pago {data.trade_ins.length > 1 ? `#${idx + 1}` : ''}</div>
-          <div style={{ margin: '4px 0' }}>A- Vehiculo</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <a href="#" style={{ color: '#60a5fa', textDecoration: 'underline', display: 'block' }}>
-              {t.description}
-            </a>
-            {(!t.isExit && !t.isSold) && (
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (data.onAddBranch) data.onAddBranch({
-                    description: t.description,
-                    chapa: t.chapa,
-                    chasis: t.chasis,
-                    operation_id: data.operation_id
-                  });
-                }}
-                title={data.onAddBranch ? "Crear rama desde este vehículo" : "No tienes permisos para agregar"}
-                style={{ 
-                  background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', 
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                  cursor: data.onAddBranch ? 'pointer' : 'not-allowed',
-                  opacity: data.onAddBranch ? 1 : 0.3,
-                  padding: 0, color: 'white', flexShrink: 0
-                }}
-              >
-                <PlusCircle size={12} />
-              </button>
-            )}
-            {t.isExit && (
-              <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 'bold', marginLeft: 'auto' }}>[SALIDA STOCK]</span>
-            )}
+      {data.trade_ins && data.trade_ins.filter(Boolean).length > 0 && data.trade_ins.filter(Boolean).map((t, idx) => {
+        const stillInStock = !t.isExit && !t.isSold;
+        return (
+          <div key={idx} style={{
+            marginTop: '12px',
+            padding: '10px 12px',
+            borderRadius: '8px',
+            background: stillInStock ? 'rgba(251, 191, 36, 0.07)' : 'transparent',
+            border: stillInStock ? '1px solid rgba(251, 191, 36, 0.3)' : 'none',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <span>A- Vehiculo Entregado como Parte de pago {data.trade_ins.length > 1 ? `#${idx + 1}` : ''}</span>
+              {stillInStock && (
+                <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.15)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
+                  EN STOCK
+                </span>
+              )}
+            </div>
+            <div style={{ margin: '4px 0' }}>A- Vehiculo</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <a href="#" style={{ color: '#60a5fa', textDecoration: 'underline', display: 'block' }}>
+                {t.description}
+              </a>
+              {(!t.isExit && !t.isSold) && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (data.onAddBranch) data.onAddBranch({
+                      description: t.description,
+                      chapa: t.chapa,
+                      chasis: t.chasis,
+                      operation_id: data.operation_id
+                    });
+                  }}
+                  title={data.onAddBranch ? "Crear rama desde este vehículo" : "No tienes permisos para agregar"}
+                  style={{
+                    background: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: data.onAddBranch ? 'pointer' : 'not-allowed',
+                    opacity: data.onAddBranch ? 1 : 0.3,
+                    padding: 0, color: 'white', flexShrink: 0
+                  }}
+                >
+                  <PlusCircle size={12} />
+                </button>
+              )}
+              {t.isExit && (
+                <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 'bold', marginLeft: 'auto' }}>[SALIDA STOCK]</span>
+              )}
+            </div>
+            <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>CHAPA: {t.chapa || 'N/A'}</div>
+            <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>CHASIS: {t.chasis || 'N/A'}</div>
+            <div style={{ marginTop: '4px' }}>A- MONTO VEHICULO {t.amount?.toLocaleString()}</div>
           </div>
-          <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>CHAPA: {t.chapa || 'N/A'}</div>
-          <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>CHASIS: {t.chasis || 'N/A'}</div>
-          <div style={{ marginTop: '4px' }}>A- MONTO VEHICULO {t.amount?.toLocaleString()}</div>
-        </div>
-      ))}
+        );
+      })}
 
       <div style={{ marginTop: '16px', borderTop: '1px solid #333', paddingTop: '12px', color: '#f3f4f6', fontWeight: 'bold' }}>
         Monto Total {data.currency} {data.total_amount?.toLocaleString()}
