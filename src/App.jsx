@@ -878,12 +878,30 @@ function App() {
   }
 
   // ── Export Stock + Market Prices to Excel ──────────────────────────────────
-  function exportStockToExcel() {
+  async function exportStockToExcel() {
     try {
       const formatNum = (v) => v ? Number(v) : 0;
-      const exportData = stockVehicles.map(item => {
+
+      // Cache de árboles ya calculados por vehículo (evita recalcular si dos filas comparten chasis/chapa)
+      const profitCache = new Map();
+      const getEstimatedProfit = async (item) => {
+        const lookupId = (item.chasis || '').trim() || (item.chapa || '').trim();
+        if (!lookupId) return '';
+        if (profitCache.has(lookupId)) return profitCache.get(lookupId);
+        try {
+          const trace = await db.getVehicleTraceability(lookupId, operations);
+          const stats = financials.getTreeStats(trace);
+          profitCache.set(lookupId, stats.totalProfit);
+          return stats.totalProfit;
+        } catch (e) {
+          return '';
+        }
+      };
+
+      const exportData = await Promise.all(stockVehicles.map(async (item) => {
         const vId = item.chasis || item.chapa || item.description;
         const md = stockMarketData[vId];
+        const estimatedProfit = await getEstimatedProfit(item);
         return {
           'Vehículo':             item.description || '',
           'Chapa':                item.chapa || '',
@@ -891,6 +909,7 @@ function App() {
           'Ingreso':              item.entry_date || '',
           'Origen':               item.source_type === 'COMPRA' ? 'PROPIO' : 'TRADE-IN',
           'Costo USD':            formatNum(item.valuation),
+          'Ganancia Est. USD':    estimatedProfit === '' ? '' : formatNum(estimatedProfit),
           'Clasipar USD':         md && !md.isLoading ? formatNum(md.clasipar)    : '',
           'Marketplace USD':      md && !md.isLoading ? formatNum(md.marketplace) : '',
           'Instagram USD':        md && !md.isLoading ? formatNum(md.instagram)   : '',
@@ -899,20 +918,20 @@ function App() {
           'Comp. $ (USD)':        md && !md.isLoading ? formatNum(md.diffDollar)  : '',
           'Comp. %':              md && !md.isLoading ? `${md.diffPercent}%`       : '',
           'Datos Reales':         md && !md.isLoading ? (
-            md.isRealData 
-              ? `SÍ (${[md.realSources?.clasipar ? 'Clasipar' : '', md.realSources?.marketplace ? 'FB' : '', md.realSources?.instagram ? 'IG' : ''].filter(Boolean).join(', ')})` 
+            md.isRealData
+              ? `SÍ (${[md.realSources?.clasipar ? 'Clasipar' : '', md.realSources?.marketplace ? 'FB' : '', md.realSources?.instagram ? 'IG' : ''].filter(Boolean).join(', ')})`
               : 'ESTIMADO (No se hallaron coincidencias)'
           ) : 'PENDIENTE',
           'Última Actualización':   md && !md.isLoading && md.updatedAt ? md.updatedAt : '',
         };
-      });
+      }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook  = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Stock y Mercado');
       worksheet['!cols'] = [
         {wch:30},{wch:12},{wch:18},{wch:14},{wch:12},
-        {wch:13},{wch:15},{wch:16},{wch:14},{wch:14},{wch:17},{wch:13},{wch:10},{wch:13},{wch:22}
+        {wch:13},{wch:15},{wch:15},{wch:16},{wch:14},{wch:14},{wch:17},{wch:13},{wch:10},{wch:13},{wch:22}
       ];
       const fecha = new Date().toISOString().slice(0,10);
       XLSX.writeFile(workbook, `Stock_Mercado_${fecha}.xlsx`);
