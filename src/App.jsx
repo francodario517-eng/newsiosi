@@ -442,6 +442,12 @@ function App() {
     }
   }
 
+  // Ver el árbol de trazabilidad de un vehículo directamente desde Inventario
+  const handleViewTreeFromStock = (item) => {
+    const op = operations.find(o => o.id === item.operation_id);
+    if (op) handleSelectOperation(op);
+  }
+
   const handleOpenBranchModal = (vehicleInfo) => {
     setPreFilledData({
       description: vehicleInfo.description,
@@ -1258,9 +1264,10 @@ function App() {
           )}
           {activeTab === 'stock' && (
             <div className="card glass card-table">
-              <StockTable 
-                stock={stockVehicles} 
+              <StockTable
+                stock={stockVehicles}
                 onSellVehicle={userProfile?.can_edit ? handleOpenBranchModal : null}
+                onViewTree={handleViewTreeFromStock}
                 marketData={stockMarketData}
                 setMarketData={setStockMarketData}
                 isUpdatingAll={isUpdatingMarket}

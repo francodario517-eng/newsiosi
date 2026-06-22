@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { ShoppingCart, Calendar, RefreshCw, Loader, TrendingUp, TrendingDown, DollarSign, Globe, Check, AlertTriangle, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { ShoppingCart, Calendar, RefreshCw, Loader, TrendingUp, TrendingDown, DollarSign, Globe, Check, AlertTriangle, ShieldCheck, ShieldAlert, GitBranch } from 'lucide-react';
 import { apifyService } from '../services/apify';
 import { db, supabase } from '../services/db';
 
-export function StockTable({ 
-  stock, 
-  onSellVehicle, 
-  marketData, 
-  setMarketData, 
-  isUpdatingAll, 
-  updateProgress, 
-  onUpdateAll 
+export function StockTable({
+  stock,
+  onSellVehicle,
+  onViewTree,
+  marketData,
+  setMarketData,
+  isUpdatingAll,
+  updateProgress,
+  onUpdateAll
 }) {
   const [lastGlobalUpdate, setLastGlobalUpdate] = useState(null);
   const [showSuccessCheck, setShowSuccessCheck] = useState(false);
@@ -320,21 +321,35 @@ export function StockTable({
                   )}
 
                   <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                    <button 
-                      className="btn btn-primary" 
-                      style={{ 
-                        padding: '8px 16px', fontSize: '12px', borderRadius: '8px',
-                        opacity: onSellVehicle ? 1 : 0.4,
-                        cursor: onSellVehicle ? 'pointer' : 'not-allowed',
-                        background: onSellVehicle ? 'var(--primary)' : 'rgba(255, 255, 255, 0.1)',
-                        border: onSellVehicle ? 'none' : '1px solid rgba(255, 255, 255, 0.1)'
-                      }}
-                      onClick={onSellVehicle ? (() => onSellVehicle(item)) : null}
-                      title={onSellVehicle ? "Vender vehículo" : "No tienes permisos para vender"}
-                    >
-                      <DollarSign size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
-                      Vender
-                    </button>
+                    <div style={{ display: 'inline-flex', gap: '8px' }}>
+                      <button
+                        className="btn btn-outline"
+                        style={{
+                          padding: '8px 12px', fontSize: '12px', borderRadius: '8px',
+                          opacity: onViewTree ? 1 : 0.4,
+                          cursor: onViewTree ? 'pointer' : 'not-allowed',
+                        }}
+                        onClick={onViewTree ? (() => onViewTree(item)) : null}
+                        title="Ver árbol de trazabilidad"
+                      >
+                        <GitBranch size={14} />
+                      </button>
+                      <button
+                        className="btn btn-primary"
+                        style={{
+                          padding: '8px 16px', fontSize: '12px', borderRadius: '8px',
+                          opacity: onSellVehicle ? 1 : 0.4,
+                          cursor: onSellVehicle ? 'pointer' : 'not-allowed',
+                          background: onSellVehicle ? 'var(--primary)' : 'rgba(255, 255, 255, 0.1)',
+                          border: onSellVehicle ? 'none' : '1px solid rgba(255, 255, 255, 0.1)'
+                        }}
+                        onClick={onSellVehicle ? (() => onSellVehicle(item)) : null}
+                        title={onSellVehicle ? "Vender vehículo" : "No tienes permisos para vender"}
+                      >
+                        <DollarSign size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
+                        Vender
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )})
