@@ -10,12 +10,15 @@ export const financials = {
    */
   getTreeStats: (traceabilityData) => {
     const { nodes } = traceabilityData;
-    if (!nodes || nodes.length === 0) return { totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0 };
+    if (!nodes || nodes.length === 0) {
+      return { totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0, unsoldTradeInValue: 0, unsoldTradeInCount: 0 };
+    }
 
     let totalRevenue = 0;
     let totalInvestment = 0;
     let tradeInCount = 0;
-    let tradeInCost = 0; // Costo de adquisición de vehículos recibidos como parte de pago
+    let unsoldTradeInValue = 0; // Valor acumulado de partes de pago aún no revendidas
+    let unsoldTradeInCount = 0;
 
     nodes.forEach(node => {
       const { operation_type, total_amount, trade_ins } = node.data;
@@ -25,22 +28,26 @@ export const financials = {
         totalRevenue += amount;
         if (trade_ins) {
           tradeInCount += trade_ins.length;
-          // Cada vehículo recibido como parte de pago tiene un costo (su valuación).
-          // Si luego se revende, esa venta ya está sumada en totalRevenue, así que
-          // hay que restar el costo de entrada para no duplicar la ganancia.
-          trade_ins.forEach(t => { tradeInCost += Number(t.amount) || 0; });
+          trade_ins.forEach(t => {
+            if (!t.isSold) {
+              unsoldTradeInValue += Number(t.amount) || 0;
+              unsoldTradeInCount += 1;
+            }
+          });
         }
       } else if (operation_type === 'compra') {
         totalInvestment += amount;
       }
     });
 
-    const totalProfit = totalRevenue - totalInvestment - tradeInCost;
+    const totalProfit = totalRevenue - totalInvestment;
     return {
       totalProfit,
       totalInvestment,
       totalRevenue,
       tradeInCount,
+      unsoldTradeInValue,
+      unsoldTradeInCount,
       status: totalProfit >= 0 ? 'ganancia' : 'perdida'
     };
   },
