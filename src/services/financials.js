@@ -33,7 +33,11 @@ export const financials = {
       const amount = Number(total_amount) || 0;
 
       if (operation_type === 'venta') {
-        totalRevenue += amount;
+        // Un vehículo que ingresa como parte de pago todavía no es efectivo —
+        // es un auto que pasa a stock. Se resta del Monto Total para que la
+        // ganancia solo refleje la parte realmente cobrada (contado + crédito).
+        const tradeInReceivedTotal = (trade_ins || []).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        totalRevenue += amount - tradeInReceivedTotal;
         if (trade_ins) {
           tradeInCount += trade_ins.length;
           trade_ins.forEach(t => {
