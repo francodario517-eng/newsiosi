@@ -388,6 +388,7 @@ function App() {
 
   // Restore/Refresh traceability if there was a highlighted vehicle or operations change
   useEffect(() => {
+    let cancelled = false;
     const refreshTree = async () => {
       if (activeTab === 'tree' && highlightedId && operations.length > 0) {
         // Find a vehicle from any operation that matches the highlightedId
@@ -396,14 +397,24 @@ function App() {
           const principalV = (op.vehicles || []).find(v => v.role === 'principal') || op.vehicles?.[0];
           const vehicleId = principalV?.chasis?.trim() || principalV?.chapa?.trim();
           if (vehicleId) {
-            const trace = await db.getVehicleTraceability(vehicleId, operations);
-            setSelectedTraceability(trace);
-            setStats(financials.getTreeStats(trace));
+            setIsTreeLoading(true);
+            try {
+              const trace = await db.getVehicleTraceability(vehicleId, operations);
+              if (!cancelled) {
+                setSelectedTraceability(trace);
+                setStats(financials.getTreeStats(trace));
+              }
+            } catch (err) {
+              console.error("Error refrescando árbol de trazabilidad:", err);
+            } finally {
+              if (!cancelled) setIsTreeLoading(false);
+            }
           }
         }
       }
     };
     refreshTree();
+    return () => { cancelled = true; };
   }, [operations, activeTab, highlightedId]);
 
   const handleSelectOperation = async (op) => {

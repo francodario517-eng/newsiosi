@@ -11,9 +11,9 @@ const AutoFit = ({ nodes }) => {
   const { fitView } = useReactFlow();
   useEffect(() => {
     if (!nodes || nodes.length === 0) return;
-    const t1 = setTimeout(() => fitView({ padding: 0.3, duration: 0 }), 50);
-    const t2 = setTimeout(() => fitView({ padding: 0.3, duration: 0 }), 300);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    const delays = [50, 200, 500, 1000, 1800];
+    const timers = delays.map(ms => setTimeout(() => fitView({ padding: 0.3, duration: 0 }), ms));
+    return () => timers.forEach(clearTimeout);
   }, [nodes, fitView]);
   return null;
 };
