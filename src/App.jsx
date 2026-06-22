@@ -1215,19 +1215,6 @@ function App() {
               </div>
             </div>
 
-            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '10px', borderRadius: '12px', display: 'flex', flexShrink: 0 }}>
-                <Package color="#3b82f6" size={20} />
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ color: 'var(--text-muted)', fontSize: '12px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Stock Actual</div>
-                {isTreeLoading ? (
-                  <div className="skeleton" style={{ height: '24px', width: '80%', marginTop: '4px' }}></div>
-                ) : (
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#3b82f6' }}>{stockVehicles.length} uni</div>
-                )}
-              </div>
-            </div>
           </div>
         )}
 
