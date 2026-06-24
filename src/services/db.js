@@ -150,7 +150,53 @@ export const db = {
     }));
   },
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Evita registrar dos veces el mismo vehículo (por chasis o chapa) como
+  // principal en operaciones de tipo "compra". Esto pasaba por errores de
+  // tipeo (ej. cargar el chasis en el campo chapa) y generaba árboles de
+  // trazabilidad con el mismo vehículo conectado dos veces.
+  // ─────────────────────────────────────────────────────────────────────────
+  _checkDuplicateCompra: async (op, excludeOpId = null) => {
+    if ((op.operation_type || '').toLowerCase() !== 'compra') return null;
+
+    const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
+    const chasis = principal?.chasis?.trim().toUpperCase();
+    const chapa = principal?.chapa?.trim().toUpperCase();
+    if (!chasis && !chapa) return null;
+
+    let query = supabase
+      .from('operations')
+      .select('id, date, vehicles(*)')
+      .eq('operation_type', 'compra');
+    if (excludeOpId) query = query.neq('id', excludeOpId);
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error validando compras duplicadas:', error);
+      return null; // no bloquear el guardado por un fallo de validación
+    }
+
+    return (data || []).find(existingOp =>
+      (existingOp.vehicles || []).some(v => {
+        if (!v || v.role !== 'principal') return false;
+        const vChasis = v.chasis?.trim().toUpperCase();
+        const vChapa = v.chapa?.trim().toUpperCase();
+        return (chasis && vChasis === chasis) || (chapa && vChapa === chapa);
+      })
+    ) || null;
+  },
+
   addOperation: async (op) => {
+    const duplicate = await db._checkDuplicateCompra(op);
+    if (duplicate) {
+      const err = new Error(
+        `Ya existe una COMPRA registrada con este chasis/chapa (operación del ${duplicate.date}). ` +
+        `Verificá los datos para evitar un registro duplicado.`
+      );
+      err.isDuplicateError = true;
+      throw err;
+    }
+
     return withMutation(async () => {
       // 1. Insert Operation
       const { data: opData, error: opError } = await supabase
@@ -197,6 +243,16 @@ export const db = {
   },
 
   updateOperation: async (id, op) => {
+    const duplicate = await db._checkDuplicateCompra(op, id);
+    if (duplicate) {
+      const err = new Error(
+        `Ya existe OTRA COMPRA registrada con este chasis/chapa (operación del ${duplicate.date}). ` +
+        `Verificá los datos para evitar un registro duplicado.`
+      );
+      err.isDuplicateError = true;
+      throw err;
+    }
+
     return withMutation(async () => {
       // 1. Update Operation
       const { data: opData, error: opError } = await supabase
