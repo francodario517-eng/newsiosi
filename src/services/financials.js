@@ -8,10 +8,13 @@ export const financials = {
    * Calculates total profit for an entire lineage (tree).
    * Logic: Sum of all Sales - Sum of all Initial Purchases
    */
+  // Comisión y gastos varios estimados por cada venta (3% del monto total).
+  COMMISSION_RATE: 0.03,
+
   getTreeStats: (traceabilityData) => {
     const { nodes } = traceabilityData;
     if (!nodes || nodes.length === 0) {
-      return { totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0, unsoldTradeInValue: 0, unsoldTradeInCount: 0 };
+      return { totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0, unsoldTradeInValue: 0, unsoldTradeInCount: 0, totalCommission: 0 };
     }
 
     // Convierte la fecha ya formateada del nodo (es-PY, ej "18/6/2026") a Date
@@ -27,6 +30,7 @@ export const financials = {
     let tradeInCount = 0;
     let unsoldTradeInValue = 0; // Valor acumulado de partes de pago aún no revendidas
     let unsoldTradeInCount = 0;
+    let totalCommission = 0; // Comisión y gastos varios (3% de cada venta)
 
     nodes.forEach(node => {
       const { operation_type, total_amount, trade_ins } = node.data;
@@ -38,6 +42,7 @@ export const financials = {
         // ganancia solo refleje la parte realmente cobrada (contado + crédito).
         const tradeInReceivedTotal = (trade_ins || []).reduce((s, t) => s + (Number(t.amount) || 0), 0);
         totalRevenue += amount - tradeInReceivedTotal;
+        totalCommission += amount * financials.COMMISSION_RATE;
         if (trade_ins) {
           tradeInCount += trade_ins.length;
           trade_ins.forEach(t => {
@@ -90,7 +95,7 @@ export const financials = {
       }
     });
 
-    const totalProfit = totalRevenue + currentHoldingValue - totalInvestment;
+    const totalProfit = totalRevenue + currentHoldingValue - totalInvestment - totalCommission;
     return {
       totalProfit,
       totalInvestment,
@@ -99,6 +104,7 @@ export const financials = {
       unsoldTradeInValue,
       unsoldTradeInCount,
       currentHoldingValue,
+      totalCommission,
       status: totalProfit >= 0 ? 'ganancia' : 'perdida'
     };
   },

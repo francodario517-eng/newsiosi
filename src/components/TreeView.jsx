@@ -267,6 +267,12 @@ const VehicleNode = ({ data }) => {
         Monto Total {data.currency} {data.total_amount?.toLocaleString()}
       </div>
 
+      {isVenta && (
+        <div style={{ marginTop: '4px', color: '#f87171', fontSize: '12px' }}>
+          Comisión y Gastos (3%) -{data.currency} {((Number(data.total_amount) || 0) * 0.03).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        </div>
+      )}
+
       {/* Output Handle (Right) */}
       <Handle type="source" position={Position.Right} style={{ background: 'var(--primary)', border: 'none', width: '10px', height: '10px' }} />
     </div>

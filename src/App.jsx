@@ -37,7 +37,7 @@ function App() {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'operations')
   const [selectedTraceability, setSelectedTraceability] = useState(null)
   const [showModal, setShowModal] = useState(false)
-  const [stats, setStats] = useState({ totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0, unsoldTradeInValue: 0, unsoldTradeInCount: 0 })
+  const [stats, setStats] = useState({ totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0, unsoldTradeInValue: 0, unsoldTradeInCount: 0, totalCommission: 0 })
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('searchQuery') || '')
   const [period, setPeriod] = useState(() => localStorage.getItem('period') || 'all') 
   const [customRange, setCustomRange] = useState({ start: '', end: '' })
@@ -426,7 +426,7 @@ function App() {
 
     if (!vehicleId) {
       setSelectedTraceability({ nodes: [], edges: [] });
-      setStats({ totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0, unsoldTradeInValue: 0, unsoldTradeInCount: 0 });
+      setStats({ totalProfit: 0, tradeInCount: 0, totalInvestment: 0, totalRevenue: 0, unsoldTradeInValue: 0, unsoldTradeInCount: 0, totalCommission: 0 });
       return;
     }
 
@@ -1264,6 +1264,20 @@ function App() {
                   <div className="skeleton" style={{ height: '24px', width: '80%', marginTop: '4px' }}></div>
                 ) : (
                   <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{stats.tradeInCount} uni</div>
+                )}
+              </div>
+            </div>
+
+            <div className="card glass" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '8px', borderRadius: '10px', display: 'flex', flexShrink: 0 }}>
+                <TrendingUp color="#ef4444" size={18} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '11px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Comisión de Ventas</div>
+                {isTreeLoading ? (
+                  <div className="skeleton" style={{ height: '20px', width: '80%', marginTop: '4px' }}></div>
+                ) : (
+                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#ef4444' }}>USD {(stats.totalCommission ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                 )}
               </div>
             </div>
