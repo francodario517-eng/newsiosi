@@ -352,6 +352,40 @@ export const db = {
     };
     roots.forEach(r => setDepth(r.id, 0));
 
+    // Cada raíz desconectada es un árbol independiente (puede haber más de una
+    // si la expansión recursiva trae cadenas de vehículos distintas). Se le
+    // asigna un índice de árbol a cada nodo para reservarle una banda vertical
+    // propia y que nunca comparta coordenadas Y con nodos de otro árbol.
+    const treeIndexOf = new Map();
+    roots.forEach((root, idx) => {
+      const stack = [root.id];
+      while (stack.length) {
+        const id = stack.pop();
+        if (treeIndexOf.has(id)) continue;
+        treeIndexOf.set(id, idx);
+        opMap.get(id).children.forEach(childId => stack.push(childId));
+      }
+    });
+
+    const treeDepthCounts = {}; // `${treeIdx}-${depth}` -> cantidad de nodos
+    Array.from(opMap.values()).forEach(op => {
+      const treeIdx = treeIndexOf.get(op.id) ?? 0;
+      const key = `${treeIdx}-${op.depth}`;
+      treeDepthCounts[key] = (treeDepthCounts[key] || 0) + 1;
+    });
+    const treeWidth = {}; // treeIdx -> máx. nodos en una misma profundidad
+    Object.entries(treeDepthCounts).forEach(([key, count]) => {
+      const treeIdx = key.split('-')[0];
+      treeWidth[treeIdx] = Math.max(treeWidth[treeIdx] || 0, count);
+    });
+    const TREE_GAP = 400; // separación visual entre árboles distintos
+    const treeYOffset = {}; // treeIdx -> y inicial reservado para ese árbol
+    let runningOffset = 0;
+    roots.forEach((root, idx) => {
+      treeYOffset[idx] = runningOffset;
+      runningOffset += (treeWidth[idx] || 1) * 800 + TREE_GAP;
+    });
+
     const soldInChain = new Set();
     ops.forEach(op => {
       const epId = opMap.get(op.id).effectiveParentId;
@@ -364,12 +398,14 @@ export const db = {
 
     const nodes = [];
     const edges = [];
-    const depthCounts = {};
+    const depthCounts = {}; // `${treeIdx}-${depth}` -> vIdx local a ese árbol
 
     Array.from(opMap.values()).sort((a, b) => a.depth - b.depth).forEach((op) => {
       const depth = op.depth;
-      const vIdx = depthCounts[depth] || 0;
-      depthCounts[depth] = vIdx + 1;
+      const treeIdx = treeIndexOf.get(op.id) ?? 0;
+      const depthKey = `${treeIdx}-${depth}`;
+      const vIdx = depthCounts[depthKey] || 0;
+      depthCounts[depthKey] = vIdx + 1;
       const nodeId = `node-${op.id}`;
       const principalV = (op.vehicles || []).find(v => v && v.role === 'principal');
       const pIdStr = getVehId(principalV);
@@ -411,7 +447,7 @@ export const db = {
           trade_ins: tradeInsData,
           raw_data: op
         },
-        position: { x: depth * 750, y: vIdx * 800 + 50 }
+        position: { x: depth * 750, y: treeYOffset[treeIdx] + vIdx * 800 + 50 }
       });
 
       const epId = opMap.get(op.id).effectiveParentId;
