@@ -548,6 +548,7 @@ function App() {
       currency: formData.get('currency') || 'USD',
       total_amount: parseMoney(formData.get('amount')),
       buyer: formData.get('buyer'),
+      seller_name: formData.get('seller_name'),
       delivery_amount: parseMoney(formData.get('delivery_amount')),
       installments: Number(formData.get('installments')) || 0,
       credit_amount: parseMoney(formData.get('credit_amount')),
@@ -1427,6 +1428,9 @@ function App() {
               
               <label>Comprador / Vendedor</label>
               <input name="buyer" defaultValue={editingOperation?.buyer || preFilledData?.buyer || ''} placeholder="Nombre completo" />
+
+              <label>Asesor de Ventas</label>
+              <input name="seller_name" defaultValue={editingOperation?.seller_name || preFilledData?.seller_name || ''} placeholder="Nombre de quien vendió el vehículo" />
 
               <div className="form-grid-3" style={{ marginTop: '16px' }}>
                  <div><label>Entrega Contado</label><input name="delivery_amount" type="text" onChange={(e) => e.target.value = formatMoney(e.target.value)} defaultValue={formatMoney(editingOperation?.delivery_amount || preFilledData?.delivery_amount || 0)} placeholder="0" /></div>

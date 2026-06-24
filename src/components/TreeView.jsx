@@ -155,6 +155,12 @@ const VehicleNode = ({ data }) => {
         {data.client_name?.toUpperCase()}
       </div>
 
+      {data.seller_name && (
+        <div style={{ marginBottom: '16px', color: 'var(--text-muted)', fontSize: '12px' }}>
+          Asesor de Ventas: <span style={{ color: '#d1d5db' }}>{data.seller_name}</span>
+        </div>
+      )}
+
       <div style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <a href="#" style={{ color: '#60a5fa', textDecoration: 'underline', marginBottom: '2px', display: 'block' }}>

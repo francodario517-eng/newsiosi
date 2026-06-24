@@ -46,7 +46,14 @@ export function OperationsTable({ operations, onSelectOperation, onDeleteOperati
                       {op.operation_type}
                     </span>
                   </td>
-                  <td style={{ padding: '16px 20px', fontSize: '14px', fontWeight: '500' }}>{op.buyer}</td>
+                  <td style={{ padding: '16px 20px', fontSize: '14px', fontWeight: '500' }}>
+                    {op.buyer}
+                    {op.seller_name && (
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '2px' }}>
+                        Asesor: {op.seller_name}
+                      </div>
+                    )}
+                  </td>
                   <td style={{ padding: '16px 20px' }}>
                     <div style={{ fontWeight: '700', fontSize: '15px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginRight: '4px' }}>{op.currency}</span>
