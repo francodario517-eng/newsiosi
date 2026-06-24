@@ -1,7 +1,37 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import ReactFlow, { Background, Controls, MiniMap, Handle, Position, ReactFlowProvider, useReactFlow } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { PlusCircle, Edit2, Pencil, Trash2, ArrowRightLeft } from 'lucide-react';
+import { PlusCircle, Edit2, Pencil, Trash2, ArrowRightLeft, Copy, Check } from 'lucide-react';
+
+// Muestra "CHAPA: X" / "CHASIS: X" con un botón para copiar el valor al
+// portapapeles (stopPropagation evita arrastrar el nodo de ReactFlow al hacer click).
+const CopyableField = ({ label, value }) => {
+  const [copied, setCopied] = useState(false);
+  const hasValue = value && value !== 'N/A';
+
+  const handleCopy = (e) => {
+    e.stopPropagation();
+    if (!hasValue) return;
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    });
+  };
+
+  return (
+    <div
+      onClick={handleCopy}
+      title={hasValue ? 'Click para copiar' : ''}
+      style={{
+        color: '#60a5fa', textDecoration: 'underline', display: 'flex',
+        alignItems: 'center', gap: '6px', cursor: hasValue ? 'pointer' : 'default'
+      }}
+    >
+      <span>{label}: {value || 'N/A'}</span>
+      {hasValue && (copied ? <Check size={12} color="#10b981" /> : <Copy size={12} style={{ opacity: 0.6, flexShrink: 0 }} />)}
+    </div>
+  );
+};
 
 // Reintenta el fitView un poco después del montaje: si el contenedor todavía
 // no tenía su tamaño final cuando ReactFlow calculó el fitView inicial
@@ -169,12 +199,8 @@ const VehicleNode = ({ data }) => {
             </button>
           )}
         </div>
-        <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>
-          CHAPA: {data.chapa || 'N/A'}
-        </div>
-        <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>
-          CHASIS: {data.chasis || 'N/A'}
-        </div>
+        <CopyableField label="CHAPA" value={data.chapa} />
+        <CopyableField label="CHASIS" value={data.chasis} />
       </div>
 
       <div>
@@ -256,8 +282,8 @@ const VehicleNode = ({ data }) => {
                 <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 'bold', marginLeft: 'auto' }}>[SALIDA STOCK]</span>
               )}
             </div>
-            <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>CHAPA: {t.chapa || 'N/A'}</div>
-            <div style={{ color: '#60a5fa', textDecoration: 'underline' }}>CHASIS: {t.chasis || 'N/A'}</div>
+            <CopyableField label="CHAPA" value={t.chapa} />
+            <CopyableField label="CHASIS" value={t.chasis} />
             <div style={{ marginTop: '4px' }}>A- MONTO VEHICULO {t.amount?.toLocaleString()}</div>
           </div>
         );
