@@ -39,12 +39,19 @@ const CopyableField = ({ label, value }) => {
 // tenga que cambiar de pestaña y volver.
 const AutoFit = ({ nodes }) => {
   const { fitView } = useReactFlow();
+  // Clave estable basada en los IDs reales de los nodos: "nodes" es un array
+  // nuevo en cada render (useMemo en el padre se recalcula seguido, p.ej. por
+  // Realtime), pero el árbol visible no cambió. Si dependiéramos del array en
+  // sí, el fitView se re-disparaba todo el tiempo y "alejaba" el zoom del
+  // usuario mientras intentaba navegar el árbol.
+  const nodeIdsKey = (nodes || []).map(n => n.id).join(',');
   useEffect(() => {
-    if (!nodes || nodes.length === 0) return;
+    if (!nodeIdsKey) return;
     const delays = [50, 200, 500, 1000, 1800];
     const timers = delays.map(ms => setTimeout(() => fitView({ padding: 0.3, duration: 0 }), ms));
     return () => timers.forEach(clearTimeout);
-  }, [nodes, fitView]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodeIdsKey, fitView]);
   return null;
 };
 
