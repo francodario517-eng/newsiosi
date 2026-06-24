@@ -584,6 +584,7 @@ function App() {
       handleSelectOperation({ ...opData, id: savedOp?.id || editingOperation?.id });
     } catch (err) {
       console.error("Error al guardar operación:", err);
+      if (err.cancelled) return; // el usuario ya canceló desde el confirm, no repetir el aviso
       alert("Error al guardar: " + (err.message || "Error desconocido"));
     }
   }

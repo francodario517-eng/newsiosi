@@ -151,10 +151,9 @@ export const db = {
   },
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Evita registrar dos veces el mismo vehículo (por chasis o chapa) como
-  // principal en operaciones de tipo "compra". Esto pasaba por errores de
-  // tipeo (ej. cargar el chasis en el campo chapa) y generaba árboles de
-  // trazabilidad con el mismo vehículo conectado dos veces.
+  // Un mismo vehículo (por chasis o chapa) puede volver a comprarse de forma
+  // legítima si ya fue vendido (recompra / vuelve como parte de pago). Solo
+  // es un error real si esa compra anterior sigue en stock sin vender.
   // ─────────────────────────────────────────────────────────────────────────
   _checkDuplicateCompra: async (op, excludeOpId = null) => {
     if ((op.operation_type || '').toLowerCase() !== 'compra') return null;
@@ -164,37 +163,62 @@ export const db = {
     const chapa = principal?.chapa?.trim().toUpperCase();
     if (!chasis && !chapa) return null;
 
-    let query = supabase
+    const { data, error } = await supabase
       .from('operations')
-      .select('id, date, vehicles(*)')
-      .eq('operation_type', 'compra');
-    if (excludeOpId) query = query.neq('id', excludeOpId);
-
-    const { data, error } = await query;
+      .select('id, date, operation_type, vehicles(*)');
     if (error) {
       console.error('Error validando compras duplicadas:', error);
       return null; // no bloquear el guardado por un fallo de validación
     }
 
-    return (data || []).find(existingOp =>
-      (existingOp.vehicles || []).some(v => {
-        if (!v || v.role !== 'principal') return false;
-        const vChasis = v.chasis?.trim().toUpperCase();
-        const vChapa = v.chapa?.trim().toUpperCase();
-        return (chasis && vChasis === chasis) || (chapa && vChapa === chapa);
-      })
-    ) || null;
+    const matches = (v) => {
+      if (!v) return false;
+      const vChasis = v.chasis?.trim().toUpperCase();
+      const vChapa = v.chapa?.trim().toUpperCase();
+      return (chasis && vChasis === chasis) || (chapa && vChapa === chapa);
+    };
+
+    const allOps = (data || []).filter(o => o.id !== excludeOpId);
+
+    const existingCompra = allOps.find(o =>
+      (o.operation_type || '').toLowerCase() === 'compra' &&
+      (o.vehicles || []).some(v => v.role === 'principal' && matches(v))
+    );
+    if (!existingCompra) return null;
+
+    // ¿Ese vehículo ya volvió a venderse después de esa compra? Si es así,
+    // la recompra (ej. como parte de pago de otra operación) es normal.
+    const alreadySold = allOps.some(o =>
+      (o.operation_type || '').toLowerCase() === 'venta' &&
+      new Date(o.date) >= new Date(existingCompra.date) &&
+      (o.vehicles || []).some(v => v.role === 'principal' && matches(v))
+    );
+
+    return { operation: existingCompra, alreadySold };
   },
 
   addOperation: async (op) => {
-    const duplicate = await db._checkDuplicateCompra(op);
-    if (duplicate) {
+    const dup = await db._checkDuplicateCompra(op);
+    if (dup && !dup.alreadySold) {
       const err = new Error(
-        `Ya existe una COMPRA registrada con este chasis/chapa (operación del ${duplicate.date}). ` +
-        `Verificá los datos para evitar un registro duplicado.`
+        `Ya existe una COMPRA registrada con este chasis/chapa (operación del ${dup.operation.date}) ` +
+        `y ese vehículo todavía no fue vendido. Verificá los datos antes de guardar.`
       );
       err.isDuplicateError = true;
       throw err;
+    }
+    if (dup && dup.alreadySold) {
+      const proceed = window.confirm(
+        `Este chasis/chapa ya tiene una COMPRA registrada el ${dup.operation.date}, pero ese vehículo ` +
+        `ya fue vendido después. ¿Confirmás que es una recompra (vuelve como parte de pago o similar) ` +
+        `y querés continuar?`
+      );
+      if (!proceed) {
+        const err = new Error('Guardado cancelado.');
+        err.isDuplicateError = true;
+        err.cancelled = true;
+        throw err;
+      }
     }
 
     return withMutation(async () => {
@@ -243,14 +267,26 @@ export const db = {
   },
 
   updateOperation: async (id, op) => {
-    const duplicate = await db._checkDuplicateCompra(op, id);
-    if (duplicate) {
+    const dup = await db._checkDuplicateCompra(op, id);
+    if (dup && !dup.alreadySold) {
       const err = new Error(
-        `Ya existe OTRA COMPRA registrada con este chasis/chapa (operación del ${duplicate.date}). ` +
-        `Verificá los datos para evitar un registro duplicado.`
+        `Ya existe OTRA COMPRA registrada con este chasis/chapa (operación del ${dup.operation.date}) ` +
+        `y ese vehículo todavía no fue vendido. Verificá los datos antes de guardar.`
       );
       err.isDuplicateError = true;
       throw err;
+    }
+    if (dup && dup.alreadySold) {
+      const proceed = window.confirm(
+        `Este chasis/chapa ya tiene OTRA COMPRA registrada el ${dup.operation.date}, pero ese vehículo ` +
+        `ya fue vendido después. ¿Confirmás que es una recompra y querés continuar?`
+      );
+      if (!proceed) {
+        const err = new Error('Guardado cancelado.');
+        err.isDuplicateError = true;
+        err.cancelled = true;
+        throw err;
+      }
     }
 
     return withMutation(async () => {
