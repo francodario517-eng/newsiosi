@@ -899,7 +899,7 @@ function App() {
         }
       };
 
-      const exportData = await Promise.all(stockVehicles.map(async (item) => {
+      const exportData = await Promise.all(filteredStockVehicles.map(async (item) => {
         const vId = item.chasis || item.chapa || item.description;
         const md = stockMarketData[vId];
         const estimatedProfit = await getEstimatedProfit(item);
@@ -1011,6 +1011,17 @@ function App() {
                            (o.payment_type || '').toLowerCase().includes(query);
 
     return (matchesBuyer || matchesVehicles || matchesGeneral) && isDateInRange(o.date);
+  });
+
+  const filteredStockVehicles = stockVehicles.filter(item => {
+    if (!isDateInRange(item.entry_date)) return false;
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
+    return (
+      (item.chapa || '').toLowerCase().includes(query) ||
+      (item.chasis || '').toLowerCase().includes(query) ||
+      (item.description || '').toLowerCase().includes(query)
+    );
   });
 
   if (!session) {
@@ -1299,7 +1310,7 @@ function App() {
           {activeTab === 'stock' && (
             <div className="card glass card-table">
               <StockTable
-                stock={stockVehicles}
+                stock={filteredStockVehicles}
                 onSellVehicle={userProfile?.can_edit ? handleOpenBranchModal : null}
                 onViewTree={handleViewTreeFromStock}
                 marketData={stockMarketData}
