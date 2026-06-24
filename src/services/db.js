@@ -10,6 +10,11 @@ if (!supabaseUrl || !supabaseKey) {
 
 export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder');
 
+// Quita TODOS los espacios (no solo los de los extremos) de chasis/chapa.
+// Un espacio de más/menos hacía que el mismo vehículo no matchee al comparar
+// chasis/chapa entre operaciones, generando duplicados y árboles incorrectos.
+const stripSpaces = (str) => (str || '').replace(/\s+/g, '');
+
 const listeners = new Set();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,8 +164,8 @@ export const db = {
     if ((op.operation_type || '').toLowerCase() !== 'compra') return null;
 
     const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
-    const chasis = principal?.chasis?.trim().toUpperCase();
-    const chapa = principal?.chapa?.trim().toUpperCase();
+    const chasis = stripSpaces(principal?.chasis).toUpperCase();
+    const chapa = stripSpaces(principal?.chapa).toUpperCase();
     if (!chasis && !chapa) return null;
 
     const { data, error } = await supabase
@@ -173,8 +178,8 @@ export const db = {
 
     const matches = (v) => {
       if (!v) return false;
-      const vChasis = v.chasis?.trim().toUpperCase();
-      const vChapa = v.chapa?.trim().toUpperCase();
+      const vChasis = stripSpaces(v.chasis).toUpperCase();
+      const vChapa = stripSpaces(v.chapa).toUpperCase();
       return (chasis && vChasis === chasis) || (chapa && vChapa === chapa);
     };
 
@@ -247,8 +252,8 @@ export const db = {
       if (op.vehicles && op.vehicles.length > 0) {
         const vehiclesToInsert = op.vehicles.map(v => ({
           operation_id: opData.id,
-          chapa: v.chapa,
-          chasis: v.chasis,
+          chapa: stripSpaces(v.chapa),
+          chasis: stripSpaces(v.chasis),
           description: v.description,
           color: v.color,
           role: v.role,
@@ -322,8 +327,8 @@ export const db = {
       if (op.vehicles && op.vehicles.length > 0) {
         const vehiclesToInsert = op.vehicles.map(v => ({
           operation_id: id,
-          chapa: v.chapa,
-          chasis: v.chasis,
+          chapa: stripSpaces(v.chapa),
+          chasis: stripSpaces(v.chasis),
           description: v.description,
           color: v.color || '',
           role: v.role,
@@ -345,7 +350,7 @@ export const db = {
     if (!allOps) allOps = await db.getOperations();
     if (!allOps || allOps.length === 0) return { nodes: [], edges: [] };
 
-    const getVehId = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
+    const getVehId = (v) => (v && stripSpaces(v.chasis || v.chapa).toUpperCase()) || '';
     const searchId = vehicleId.trim().toUpperCase();
 
     // 1. Initial set: ops containing search vehicleId
