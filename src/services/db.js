@@ -275,13 +275,15 @@ export const db = {
           const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
           if (principal) {
             const pId = getVehId(principal);
-            const smartParent = allOps.find(o => !currentIds.has(o.id) && (
-              (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId) ||
-              ((o.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === 'compra' || 
-                o.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === 'rescision') && 
-               (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === pId))
-            ));
-            if (smartParent) { treeOps.push(smartParent); changed = true; }
+            if (pId) {
+              const smartParent = allOps.find(o => !currentIds.has(o.id) && (
+                (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId) ||
+                ((o.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === 'compra' ||
+                  o.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === 'rescision') &&
+                 (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === pId))
+              ));
+              if (smartParent) { treeOps.push(smartParent); changed = true; }
+            }
           }
 
           // B. Downward Expansion (Children)
