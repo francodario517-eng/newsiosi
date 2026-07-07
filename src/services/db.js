@@ -350,7 +350,7 @@ export const db = {
 
   getVehicleTraceability: async (vehicleId, allOps = null) => {
     if (!allOps) allOps = await db.getOperations();
-    if (!allOps || allOps.length === 0) return { nodes: [], edges: [], warnings: [] };
+    if (!allOps || allOps.length === 0) return { nodes: [], edges: [] };
 
     const getVehId = (v) => (v && stripSpaces(v.chasis || v.chapa).toUpperCase()) || '';
     const searchId = vehicleId.trim().toUpperCase();
@@ -463,42 +463,6 @@ export const db = {
 
     const roots = ops.filter(op => !opMap.get(op.id).effectiveParentId);
 
-    // Un mismo chasis/chapa recibido como parte de pago en más de una
-    // operación, sin que ese vehículo haya sido revendido (como principal)
-    // entre una entrega y la otra, es físicamente imposible: un auto no
-    // puede entregarse dos veces como parte de pago sin pasar por una venta
-    // en el medio. Esto casi siempre es un chasis/chapa mal tipeado o
-    // copiado por error, y es la causa más común de que el árbol se muestre
-    // partido en ramas separadas. Se reporta como advertencia para que se
-    // pueda corregir la carga.
-    const warnings = [];
-    if (roots.length > 1) {
-      const tradeInOccurrences = new Map();
-      ops.forEach(op => {
-        (op.vehicles || []).filter(v => v && v.role === 'parte_pago').forEach(t => {
-          const tId = getVehId(t);
-          if (!tId) return;
-          if (!tradeInOccurrences.has(tId)) tradeInOccurrences.set(tId, []);
-          tradeInOccurrences.get(tId).push(op);
-        });
-      });
-      tradeInOccurrences.forEach((occOps, id) => {
-        if (occOps.length < 2) return;
-        const wasResoldBetween = ops.some(o => {
-          const p = (o.vehicles || []).find(v => v && v.role === 'principal');
-          return p && getVehId(p) === id;
-        });
-        if (!wasResoldBetween) {
-          warnings.push({
-            type: 'duplicate_chasis',
-            vehicleId: id,
-            message: `El chasis/chapa "${id}" aparece como parte de pago en ${occOps.length} operaciones distintas sin haber sido revendido entre ellas. Revisá si está bien cargado.`,
-            operations: occOps.map(o => ({ id: o.id, date: o.date, buyer: o.buyer, operation_type: o.operation_type }))
-          });
-        }
-      });
-    }
-
     const visited = new Set();
     const setDepth = (id, depth) => {
       if (visited.has(id)) return;
@@ -509,10 +473,12 @@ export const db = {
     };
     roots.forEach(r => setDepth(r.id, 0));
 
-    // Cada raíz desconectada es un árbol independiente (puede haber más de una
-    // si la expansión recursiva trae cadenas de vehículos distintas). Se le
-    // asigna un índice de árbol a cada nodo para reservarle una banda vertical
-    // propia y que nunca comparta coordenadas Y con nodos de otro árbol.
+    // La expansión puede traer más de un árbol desconectado (p. ej. un
+    // vehículo recibido como parte de pago que tiene su propia historia de
+    // compra completamente separada). Un árbol con compra/rescisión propia
+    // es autocontenido: nunca se combina con otro árbol distinto, aunque
+    // ambos hayan quedado en el mismo resultado de la búsqueda. Nos
+    // quedamos únicamente con el árbol que contiene el vehículo buscado.
     const treeIndexOf = new Map();
     roots.forEach((root, idx) => {
       const stack = [root.id];
@@ -524,27 +490,12 @@ export const db = {
       }
     });
 
-    const treeDepthCounts = {}; // `${treeIdx}-${depth}` -> cantidad de nodos
-    Array.from(opMap.values()).forEach(op => {
-      const treeIdx = treeIndexOf.get(op.id) ?? 0;
-      const key = `${treeIdx}-${op.depth}`;
-      treeDepthCounts[key] = (treeDepthCounts[key] || 0) + 1;
-    });
-    const treeWidth = {}; // treeIdx -> máx. nodos en una misma profundidad
-    Object.entries(treeDepthCounts).forEach(([key, count]) => {
-      const treeIdx = key.split('-')[0];
-      treeWidth[treeIdx] = Math.max(treeWidth[treeIdx] || 0, count);
-    });
-    const TREE_GAP = 400; // separación visual entre árboles distintos
-    const treeYOffset = {}; // treeIdx -> y inicial reservado para ese árbol
-    let runningOffset = 0;
-    roots.forEach((root, idx) => {
-      treeYOffset[idx] = runningOffset;
-      runningOffset += (treeWidth[idx] || 1) * 800 + TREE_GAP;
-    });
+    const searchedOp = ops.find(op => (op.vehicles || []).some(v => getVehId(v) === searchId));
+    const targetTreeIdx = searchedOp ? treeIndexOf.get(searchedOp.id) : 0;
+    const relevantOps = ops.filter(op => treeIndexOf.get(op.id) === targetTreeIdx);
 
     const soldInChain = new Set();
-    ops.forEach(op => {
+    relevantOps.forEach(op => {
       const epId = opMap.get(op.id).effectiveParentId;
       if (epId) {
         const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
@@ -555,14 +506,12 @@ export const db = {
 
     const nodes = [];
     const edges = [];
-    const depthCounts = {}; // `${treeIdx}-${depth}` -> vIdx local a ese árbol
+    const depthCounts = {}; // depth -> vIdx
 
-    Array.from(opMap.values()).sort((a, b) => a.depth - b.depth).forEach((op) => {
+    relevantOps.map(op => opMap.get(op.id)).sort((a, b) => a.depth - b.depth).forEach((op) => {
       const depth = op.depth;
-      const treeIdx = treeIndexOf.get(op.id) ?? 0;
-      const depthKey = `${treeIdx}-${depth}`;
-      const vIdx = depthCounts[depthKey] || 0;
-      depthCounts[depthKey] = vIdx + 1;
+      const vIdx = depthCounts[depth] || 0;
+      depthCounts[depth] = vIdx + 1;
       const nodeId = `node-${op.id}`;
       const principalV = (op.vehicles || []).find(v => v && v.role === 'principal');
       const pIdStr = getVehId(principalV);
@@ -605,7 +554,7 @@ export const db = {
           trade_ins: tradeInsData,
           raw_data: op
         },
-        position: { x: depth * 750, y: treeYOffset[treeIdx] + vIdx * 800 + 50 }
+        position: { x: depth * 750, y: vIdx * 800 + 50 }
       });
 
       const epId = opMap.get(op.id).effectiveParentId;
@@ -634,7 +583,7 @@ export const db = {
       }
     });
 
-    return { nodes, edges, warnings };
+    return { nodes, edges };
   },
 
   deleteOperation: async (id) => {
