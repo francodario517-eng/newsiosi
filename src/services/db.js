@@ -463,6 +463,20 @@ export const db = {
 
     const roots = ops.filter(op => !opMap.get(op.id).effectiveParentId);
 
+    if (roots.length > 1) {
+      console.warn(`[Trazabilidad] ${roots.length} árboles desconectados para búsqueda "${vehicleId}":`);
+      ops.forEach(op => {
+        const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
+        const tradeIns = (op.vehicles || []).filter(v => v && v.role === 'parte_pago');
+        console.warn(
+          `  op=${op.id.slice(0, 8)} date=${op.date} type=${op.operation_type} buyer=${op.buyer} ` +
+          `principal=[${principal?.chasis || ''}|${principal?.chapa || ''}] ` +
+          `tradeIns=[${tradeIns.map(t => `${t.chasis || ''}|${t.chapa || ''}`).join(', ')}] ` +
+          `parent_id=${op.parent_id || ''} effectiveParentId=${opMap.get(op.id).effectiveParentId || ''}`
+        );
+      });
+    }
+
     const visited = new Set();
     const setDepth = (id, depth) => {
       if (visited.has(id)) return;
