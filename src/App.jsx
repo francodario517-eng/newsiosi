@@ -18,7 +18,8 @@ import {
   Users,
   Shield,
   Edit2,
-  Menu
+  Menu,
+  AlertTriangle
 } from 'lucide-react'
 import './index.css'
 import { db } from './services/db'
@@ -1327,7 +1328,32 @@ function App() {
                    {selectedTraceability ? 'Diagrama de Flujo Comercial' : 'Buscá un vehículo para ver su historial'}
                  </p>
                </div>
-               
+
+               {selectedTraceability?.warnings?.length > 0 && (
+                 <div style={{ margin: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                   {selectedTraceability.warnings.map((w, idx) => (
+                     <div key={idx} style={{
+                       display: 'flex', gap: '12px', padding: '14px 16px',
+                       borderRadius: '8px', background: 'rgba(251, 191, 36, 0.08)',
+                       border: '1px solid rgba(251, 191, 36, 0.3)'
+                     }}>
+                       <AlertTriangle size={18} color="#fbbf24" style={{ flexShrink: 0, marginTop: '2px' }} />
+                       <div style={{ fontSize: '13px', color: '#fbbf24' }}>
+                         <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Posible chasis/chapa duplicado: {w.vehicleId}</div>
+                         <div style={{ color: 'var(--text-muted)', marginBottom: '6px' }}>{w.message}</div>
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                           {w.operations.map(o => (
+                             <span key={o.id} style={{ color: 'var(--text-muted)' }}>
+                               • {o.date} — {o.operation_type?.toUpperCase()} — {o.buyer}
+                             </span>
+                           ))}
+                         </div>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               )}
+
                {!selectedTraceability && searchQuery && filteredOperations.length > 0 ? (
                  <div style={{ padding: '24px' }}>
                    <div style={{ marginBottom: '16px', color: 'var(--primary)', fontWeight: 'bold' }}>

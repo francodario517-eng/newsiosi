@@ -350,7 +350,7 @@ export const db = {
 
   getVehicleTraceability: async (vehicleId, allOps = null) => {
     if (!allOps) allOps = await db.getOperations();
-    if (!allOps || allOps.length === 0) return { nodes: [], edges: [] };
+    if (!allOps || allOps.length === 0) return { nodes: [], edges: [], warnings: [] };
 
     const getVehId = (v) => (v && stripSpaces(v.chasis || v.chapa).toUpperCase()) || '';
     const searchId = vehicleId.trim().toUpperCase();
@@ -463,17 +463,39 @@ export const db = {
 
     const roots = ops.filter(op => !opMap.get(op.id).effectiveParentId);
 
+    // Un mismo chasis/chapa recibido como parte de pago en más de una
+    // operación, sin que ese vehículo haya sido revendido (como principal)
+    // entre una entrega y la otra, es físicamente imposible: un auto no
+    // puede entregarse dos veces como parte de pago sin pasar por una venta
+    // en el medio. Esto casi siempre es un chasis/chapa mal tipeado o
+    // copiado por error, y es la causa más común de que el árbol se muestre
+    // partido en ramas separadas. Se reporta como advertencia para que se
+    // pueda corregir la carga.
+    const warnings = [];
     if (roots.length > 1) {
-      console.warn(`[Trazabilidad] ${roots.length} árboles desconectados para búsqueda "${vehicleId}":`);
+      const tradeInOccurrences = new Map();
       ops.forEach(op => {
-        const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
-        const tradeIns = (op.vehicles || []).filter(v => v && v.role === 'parte_pago');
-        console.warn(
-          `  op=${op.id.slice(0, 8)} date=${op.date} type=${op.operation_type} buyer=${op.buyer} ` +
-          `principal=[${principal?.chasis || ''}|${principal?.chapa || ''}] ` +
-          `tradeIns=[${tradeIns.map(t => `${t.chasis || ''}|${t.chapa || ''}`).join(', ')}] ` +
-          `parent_id=${op.parent_id || ''} effectiveParentId=${opMap.get(op.id).effectiveParentId || ''}`
-        );
+        (op.vehicles || []).filter(v => v && v.role === 'parte_pago').forEach(t => {
+          const tId = getVehId(t);
+          if (!tId) return;
+          if (!tradeInOccurrences.has(tId)) tradeInOccurrences.set(tId, []);
+          tradeInOccurrences.get(tId).push(op);
+        });
+      });
+      tradeInOccurrences.forEach((occOps, id) => {
+        if (occOps.length < 2) return;
+        const wasResoldBetween = ops.some(o => {
+          const p = (o.vehicles || []).find(v => v && v.role === 'principal');
+          return p && getVehId(p) === id;
+        });
+        if (!wasResoldBetween) {
+          warnings.push({
+            type: 'duplicate_chasis',
+            vehicleId: id,
+            message: `El chasis/chapa "${id}" aparece como parte de pago en ${occOps.length} operaciones distintas sin haber sido revendido entre ellas. Revisá si está bien cargado.`,
+            operations: occOps.map(o => ({ id: o.id, date: o.date, buyer: o.buyer, operation_type: o.operation_type }))
+          });
+        }
       });
     }
 
@@ -612,7 +634,7 @@ export const db = {
       }
     });
 
-    return { nodes, edges };
+    return { nodes, edges, warnings };
   },
 
   deleteOperation: async (id) => {
