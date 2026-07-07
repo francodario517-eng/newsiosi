@@ -416,20 +416,40 @@ export const db = {
       opMap.set(op.id, { ...op, children: [], depth: 0 });
     });
 
+    // Un mismo veh\u00edculo puede entrar como parte de pago m\u00e1s de una vez a lo
+    // largo de su historia (se vende, y m\u00e1s tarde vuelve a entregarse como
+    // parte de pago de otra operaci\u00f3n). Entre varios candidatos a "padre",
+    // elegimos el evento de entrada cronol\u00f3gicamente m\u00e1s cercano (el \u00faltimo
+    // antes o en la fecha de esta operaci\u00f3n), no el primero que aparezca en
+    // el arreglo, para no cortar la cadena real en dos \u00e1rboles separados.
+    const opTime = (o) => {
+      const t = new Date(o.date).getTime();
+      return isNaN(t) ? 0 : t;
+    };
+    const closestBefore = (candidates, refTime) => {
+      if (candidates.length === 0) return null;
+      const before = candidates.filter(o => opTime(o) <= refTime);
+      const pool = before.length > 0 ? before : candidates;
+      return pool.reduce((best, o) => (opTime(o) > opTime(best) ? o : best), pool[0]);
+    };
+
     ops.forEach(op => {
       const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
       const pId = getVehId(principal);
-      
+      const refTime = opTime(op);
+
       let parentId = op.parent_id;
       if (!parentId && pId) {
-        let smartParent = ops.find(o => (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId));
-        
+        const parteDePagoCandidates = ops.filter(o => o.id !== op.id && (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId));
+        let smartParent = closestBefore(parteDePagoCandidates, refTime);
+
         const opType = op.operation_type?.toLowerCase();
         if (!smartParent && (opType === 'venta' || opType === 'remate')) {
-          smartParent = ops.find(o => {
+          const compraCandidates = ops.filter(o => {
             const pType = o.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             return (pType === 'compra' || pType === 'rescision') && (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === pId);
           });
+          smartParent = closestBefore(compraCandidates, refTime);
         }
 
         if (smartParent) parentId = smartParent.id;
