@@ -386,7 +386,16 @@ function App() {
     setIsMenuOpen(false); // Close menu on tab change
   }, [activeTab, searchQuery, period, highlightedId]);
 
-  // Restore/Refresh traceability if there was a highlighted vehicle or operations change
+  // Restore/Refresh traceability if there was a highlighted vehicle or operations change.
+  // "operations" cambia de referencia en cada sincronización Realtime, aunque
+  // sea por una operación totalmente ajena al árbol que se está mirando. Si
+  // mostráramos el loader (isTreeLoading) en cada una de esas pasadas, el
+  // <TreeView> desmonta y remonta el canvas de ReactFlow por completo,
+  // perdiendo el zoom/paneo que el usuario acaba de hacer. Por eso solo se
+  // muestra el loader cuando el usuario realmente cambia de vehículo
+  // (highlightedId distinto al último árbol cargado); las actualizaciones de
+  // fondo para el mismo árbol se recalculan en silencio, sin remontar nada.
+  const lastLoadedTreeIdRef = React.useRef(null);
   useEffect(() => {
     let cancelled = false;
     const refreshTree = async () => {
@@ -397,17 +406,19 @@ function App() {
           const principalV = (op.vehicles || []).find(v => v.role === 'principal') || op.vehicles?.[0];
           const vehicleId = principalV?.chasis?.trim() || principalV?.chapa?.trim();
           if (vehicleId) {
-            setIsTreeLoading(true);
+            const isFreshSelection = lastLoadedTreeIdRef.current !== highlightedId;
+            if (isFreshSelection) setIsTreeLoading(true);
             try {
               const trace = await db.getVehicleTraceability(vehicleId, operations);
               if (!cancelled) {
                 setSelectedTraceability(trace);
                 setStats(financials.getTreeStats(trace));
+                lastLoadedTreeIdRef.current = highlightedId;
               }
             } catch (err) {
               console.error("Error refrescando árbol de trazabilidad:", err);
             } finally {
-              if (!cancelled) setIsTreeLoading(false);
+              if (!cancelled && isFreshSelection) setIsTreeLoading(false);
             }
           }
         }
@@ -423,6 +434,11 @@ function App() {
 
     setHighlightedId(op.id);
     setActiveTab('tree');
+    // Ya nos encargamos de cargar y mostrar el loader acá abajo; marcamos el
+    // árbol como "ya cargado" para que el useEffect de refreshTree (que
+    // también se dispara al cambiar highlightedId) no repita el mismo
+    // trabajo ni vuelva a parpadear el loader.
+    lastLoadedTreeIdRef.current = op.id;
 
     if (!vehicleId) {
       setSelectedTraceability({ nodes: [], edges: [] });
