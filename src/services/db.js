@@ -348,6 +348,28 @@ export const db = {
     });
   },
 
+  // Carga rápida: actualiza SOLO los campos financieros de una operación
+  // (entrega contado, cuotas, monto crédito). No toca los vehículos ni corre
+  // la validación de compra duplicada, así que es mucho más liviano/rápido que
+  // updateOperation. Pensado para completar en lote datos faltantes.
+  updateOperationFinancials: async (id, { delivery_amount, installments, credit_amount }) => {
+    return withMutation(async () => {
+      const { data, error } = await supabase
+        .from('operations')
+        .update({
+          delivery_amount: delivery_amount || 0,
+          installments: installments || 0,
+          credit_amount: credit_amount || 0
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { ...data, parentId: data.parent_id };
+    });
+  },
+
   getVehicleTraceability: async (vehicleId, allOps = null) => {
     if (!allOps) allOps = await db.getOperations();
     if (!allOps || allOps.length === 0) return { nodes: [], edges: [] };

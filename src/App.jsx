@@ -18,7 +18,8 @@ import {
   Users,
   Shield,
   Edit2,
-  Menu
+  Menu,
+  Zap
 } from 'lucide-react'
 import './index.css'
 import { db } from './services/db'
@@ -31,7 +32,11 @@ import { UserManagement } from './components/UserManagement'
 import { supabase } from './services/db'
 import * as XLSX from 'xlsx'
 import { StockTable } from './components/StockTable'
+import { QuickLoad } from './components/QuickLoad'
 import { apifyService } from './services/apify'
+
+// Email autorizado a usar la Carga Rápida de datos financieros.
+const QUICKLOAD_EMAIL = 'francodario517@gmail.com'
 
 function App() {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'operations')
@@ -294,6 +299,15 @@ function App() {
   const parseMoney = (val) => {
     if (!val) return 0;
     return Number(val.toString().replace(/\./g, '')) || 0;
+  };
+
+  // Solo este usuario ve la Carga Rápida de datos financieros.
+  const canQuickLoad = (session?.user?.email || '').toLowerCase() === QUICKLOAD_EMAIL;
+
+  // Guardado liviano de solo los 3 campos financieros (para la Carga Rápida).
+  // La lista se refresca sola vía la suscripción Realtime (db.subscribe).
+  const handleSaveFinancials = async (id, values) => {
+    await db.updateOperationFinancials(id, values);
   };
 
 
@@ -1084,6 +1098,11 @@ function App() {
           <button className={`btn ${activeTab === 'stats' ? 'btn-primary' : ''}`} onClick={() => { setActiveTab('stats'); setIsMenuOpen(false); }}>
             <BarChart3 size={20} /> Analítica
           </button>
+          {canQuickLoad && (
+            <button className={`btn ${activeTab === 'quickload' ? 'btn-primary' : ''}`} onClick={() => { setActiveTab('quickload'); setIsMenuOpen(false); }}>
+              <Zap size={20} /> Carga Rápida
+            </button>
+          )}
           {userProfile?.is_admin && (
             <button className={`btn ${activeTab === 'users' ? 'btn-primary' : ''}`} onClick={() => { setActiveTab('users'); setIsMenuOpen(false); }}>
               <Users size={20} /> Usuarios
@@ -1149,8 +1168,8 @@ function App() {
       <main className="main-content">
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <div className="animate-in" style={{ flex: 'none', width: '100%', marginBottom: '4px' }}>
-            <h1 className="h1-responsive">{activeTab === 'operations' ? 'Operaciones' : activeTab === 'stock' ? 'Inventario' : activeTab === 'tree' ? 'Trazabilidad' : 'Analítica'}</h1>
-            <h2 style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>{activeTab === 'operations' ? 'Gestión de transacciones' : activeTab === 'stock' ? 'Vehículos en stock' : activeTab === 'tree' ? 'Cadena de valor' : 'KPIs Financieros'}</h2>
+            <h1 className="h1-responsive">{activeTab === 'operations' ? 'Operaciones' : activeTab === 'stock' ? 'Inventario' : activeTab === 'tree' ? 'Trazabilidad' : activeTab === 'quickload' ? 'Carga Rápida' : 'Analítica'}</h1>
+            <h2 style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>{activeTab === 'operations' ? 'Gestión de transacciones' : activeTab === 'stock' ? 'Vehículos en stock' : activeTab === 'tree' ? 'Cadena de valor' : activeTab === 'quickload' ? 'Completar entrega, cuotas y crédito' : 'KPIs Financieros'}</h2>
           </div>
 
           <div className="tools-bar" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', flex: '1 1 auto' }}>
@@ -1373,6 +1392,15 @@ function App() {
             <StatsDashboard 
               metrics={financials.getGlobalMetrics(operations, filteredOperations)} 
               stock={stockVehicles}
+            />
+          )}
+
+          {activeTab === 'quickload' && canQuickLoad && (
+            <QuickLoad
+              operations={operations}
+              formatMoney={formatMoney}
+              parseMoney={parseMoney}
+              onSave={handleSaveFinancials}
             />
           )}
 
