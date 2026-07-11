@@ -150,6 +150,13 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
                 >
                   {/* Datos de la operación */}
                   <div style={{ flex: '2 1 200px', minWidth: '180px' }}>
+                    <span style={{
+                      display: 'inline-block', marginBottom: '4px',
+                      padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
+                      background: op.operation_type === 'compra' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(170, 59, 255, 0.1)',
+                      color: op.operation_type === 'compra' ? '#10b981' : '#aa3bff',
+                      border: `1px solid ${op.operation_type === 'compra' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(170, 59, 255, 0.2)'}`
+                    }}>{op.operation_type || 'venta'}</span>
                     <div style={{ color: 'white', fontWeight: 600, fontSize: '14px' }}>{op.buyer || 'Sin cliente'}</div>
                     <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
                       {vehLabel}{chapaChasis ? <span style={{ fontFamily: 'monospace' }}> — {chapaChasis}</span> : null}
