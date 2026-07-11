@@ -358,7 +358,7 @@ export const db = {
     if ('delivery_amount' in fields) payload.delivery_amount = fields.delivery_amount || 0;
     if ('installments' in fields) payload.installments = fields.installments || 0;
     if ('credit_amount' in fields) payload.credit_amount = fields.credit_amount || 0;
-    if ('operation_type' in fields && fields.operation_type) payload.operation_type = fields.operation_type;
+    if ('payment_type' in fields && fields.payment_type) payload.payment_type = fields.payment_type;
     // La fecha llega como dd/mm/yyyy (igual que en el resto de la app) y se
     // guarda como yyyy-mm-dd, tal cual hace updateOperation/addOperation.
     if ('date' in fields && fields.date) payload.date = fields.date.split('/').reverse().join('-');

@@ -5,7 +5,7 @@ import { Check, Loader, Zap, Search, CheckCircle2 } from 'lucide-react';
 // para las operaciones que todavía no tienen esos datos cargados (todo en 0).
 // Cada fila es un mini-formulario: escribís los 3 valores y guardás (o Enter).
 // Al guardar, la operación deja de tener valores en 0 y desaparece de la lista.
-const OP_TYPES = ['venta', 'compra', 'rescisión', 'remate'];
+const PAYMENT_TYPES = ['contado', 'crédito'];
 
 // Normaliza cualquier fecha (dd/mm/yyyy legacy o yyyy-mm-dd) al formato
 // yyyy-mm-dd que necesita <input type="date">, con ceros a la izquierda.
@@ -49,7 +49,7 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
     const e = edits[op.id];
     if (e && field in e) return e[field];
     if (field === 'date') return toDateInput(op.date);
-    if (field === 'type') return (op.operation_type || 'venta').toLowerCase();
+    if (field === 'pago') return (op.payment_type || 'contado').toLowerCase();
     return '';
   };
 
@@ -65,7 +65,7 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
     try {
       await onSave(op.id, {
         date: dateInput ? `${dd}/${mm}/${yy}` : undefined, // db lo guarda como yyyy-mm-dd
-        operation_type: fieldVal(op, 'type'),
+        payment_type: fieldVal(op, 'pago'),
         delivery_amount: parseMoney(fieldVal(op, 'delivery')),
         installments: Number(fieldVal(op, 'installments')) || 0,
         credit_amount: parseMoney(fieldVal(op, 'credit'))
@@ -167,13 +167,13 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
                     />
                   </div>
                   <div style={{ flex: '0 1 120px', minWidth: '110px' }}>
-                    <label style={labelStyle}>Tipo</label>
+                    <label style={labelStyle}>Pago</label>
                     <select
-                      value={fieldVal(op, 'type')}
-                      onChange={(ev) => setField(op.id, 'type', ev.target.value)}
+                      value={fieldVal(op, 'pago')}
+                      onChange={(ev) => setField(op.id, 'pago', ev.target.value)}
                       style={{ ...inputStyle, textTransform: 'capitalize' }}
                     >
-                      {OP_TYPES.map(t => (
+                      {PAYMENT_TYPES.map(t => (
                         <option key={t} value={t} style={{ background: '#1a1b23', textTransform: 'capitalize' }}>{t}</option>
                       ))}
                     </select>
