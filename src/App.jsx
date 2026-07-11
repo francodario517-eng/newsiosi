@@ -304,10 +304,10 @@ function App() {
   // Solo este usuario ve la Carga Rápida de datos financieros.
   const canQuickLoad = (session?.user?.email || '').toLowerCase() === QUICKLOAD_EMAIL;
 
-  // Guardado liviano de solo los 3 campos financieros (para la Carga Rápida).
-  // La lista se refresca sola vía la suscripción Realtime (db.subscribe).
-  const handleSaveFinancials = async (id, values) => {
-    await db.updateOperationFinancials(id, values);
+  // Guardado liviano de campos sueltos (para la Carga Rápida): fecha, tipo,
+  // entrega, cuotas y crédito. La lista se refresca sola vía Realtime.
+  const handleQuickSave = async (id, values) => {
+    await db.updateOperationQuick(id, values);
   };
 
 
@@ -1400,7 +1400,7 @@ function App() {
               operations={operations}
               formatMoney={formatMoney}
               parseMoney={parseMoney}
-              onSave={handleSaveFinancials}
+              onSave={handleQuickSave}
             />
           )}
 

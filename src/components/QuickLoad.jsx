@@ -1,17 +1,29 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, Check, Loader, Zap, Search, CheckCircle2 } from 'lucide-react';
+import { Check, Loader, Zap, Search, CheckCircle2 } from 'lucide-react';
 
 // Carga Rápida — completar Entrega Contado / Cuotas / Monto Crédito
 // para las operaciones que todavía no tienen esos datos cargados (todo en 0).
 // Cada fila es un mini-formulario: escribís los 3 valores y guardás (o Enter).
 // Al guardar, la operación deja de tener valores en 0 y desaparece de la lista.
+const OP_TYPES = ['venta', 'compra', 'rescisión', 'remate'];
+
+// Normaliza cualquier fecha (dd/mm/yyyy legacy o yyyy-mm-dd) al formato
+// yyyy-mm-dd que necesita <input type="date">, con ceros a la izquierda.
+const toDateInput = (d) => {
+  if (!d) return '';
+  const s = String(d);
+  let y, m, day;
+  if (s.includes('/')) { [day, m, y] = s.split('/'); }
+  else { [y, m, day] = s.split('-'); }
+  if (!y || !m || !day) return '';
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
 export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
-  const [edits, setEdits] = useState({});       // id -> { delivery, installments, credit }
+  const [edits, setEdits] = useState({});       // id -> { date, type, delivery, installments, credit }
   const [savingId, setSavingId] = useState(null);
   const [savedCount, setSavedCount] = useState(0);
   const [query, setQuery] = useState('');
-
-  const emptyEdit = { delivery: '', installments: '', credit: '' };
 
   // Solo operaciones SIN datos financieros válidos (los 3 campos en 0/vacío).
   const pending = useMemo(() => {
@@ -31,21 +43,32 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
     });
   }, [operations, query]);
 
-  const getEdit = (id) => edits[id] || emptyEdit;
+  // Valor a mostrar por campo: si el usuario lo editó, ese; si no, el valor
+  // actual de la operación (fecha/tipo) o vacío (montos, que arrancan en blanco).
+  const fieldVal = (op, field) => {
+    const e = edits[op.id];
+    if (e && field in e) return e[field];
+    if (field === 'date') return toDateInput(op.date);
+    if (field === 'type') return (op.operation_type || 'venta').toLowerCase();
+    return '';
+  };
 
   const setField = (id, field, value) => {
-    setEdits(prev => ({ ...prev, [id]: { ...(prev[id] || emptyEdit), [field]: value } }));
+    setEdits(prev => ({ ...prev, [id]: { ...(prev[id] || {}), [field]: value } }));
   };
 
   const handleSave = async (op) => {
     if (savingId) return;
-    const e = getEdit(op.id);
+    const dateInput = fieldVal(op, 'date'); // yyyy-mm-dd
+    const [yy, mm, dd] = dateInput.split('-');
     setSavingId(op.id);
     try {
       await onSave(op.id, {
-        delivery_amount: parseMoney(e.delivery),
-        installments: Number(e.installments) || 0,
-        credit_amount: parseMoney(e.credit)
+        date: dateInput ? `${dd}/${mm}/${yy}` : undefined, // db lo guarda como yyyy-mm-dd
+        operation_type: fieldVal(op, 'type'),
+        delivery_amount: parseMoney(fieldVal(op, 'delivery')),
+        installments: Number(fieldVal(op, 'installments')) || 0,
+        credit_amount: parseMoney(fieldVal(op, 'credit'))
       });
       setSavedCount(c => c + 1);
       // Limpiar el borrador local; la fila desaparece con el refresh de Realtime
@@ -114,7 +137,6 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {pending.map((op) => {
-              const e = getEdit(op.id);
               const principal = (op.vehicles || []).find(v => v?.role === 'principal') || op.vehicles?.[0];
               const vehLabel = principal ? (principal.description || principal.chapa || principal.chasis || '—') : '—';
               const chapaChasis = principal ? [principal.chapa, principal.chasis].filter(Boolean).join(' · ') : '';
@@ -127,30 +149,40 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
                   style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px', display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'flex-end' }}
                 >
                   {/* Datos de la operación */}
-                  <div style={{ flex: '2 1 240px', minWidth: '200px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                      <span style={{
-                        padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase',
-                        background: op.operation_type === 'compra' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(170, 59, 255, 0.1)',
-                        color: op.operation_type === 'compra' ? '#10b981' : '#aa3bff',
-                        border: `1px solid ${op.operation_type === 'compra' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(170, 59, 255, 0.2)'}`
-                      }}>{op.operation_type}</span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                        <Calendar size={12} /> {op.date}
-                      </span>
-                    </div>
+                  <div style={{ flex: '2 1 200px', minWidth: '180px' }}>
                     <div style={{ color: 'white', fontWeight: 600, fontSize: '14px' }}>{op.buyer || 'Sin cliente'}</div>
                     <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
                       {vehLabel}{chapaChasis ? <span style={{ fontFamily: 'monospace' }}> — {chapaChasis}</span> : null}
                     </div>
                   </div>
 
-                  {/* Campos */}
+                  {/* Campos editables */}
+                  <div style={{ flex: '0 1 150px', minWidth: '140px' }}>
+                    <label style={labelStyle}>Fecha</label>
+                    <input
+                      type="date"
+                      value={fieldVal(op, 'date')}
+                      onChange={(ev) => setField(op.id, 'date', ev.target.value)}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ flex: '0 1 120px', minWidth: '110px' }}>
+                    <label style={labelStyle}>Tipo</label>
+                    <select
+                      value={fieldVal(op, 'type')}
+                      onChange={(ev) => setField(op.id, 'type', ev.target.value)}
+                      style={{ ...inputStyle, textTransform: 'capitalize' }}
+                    >
+                      {OP_TYPES.map(t => (
+                        <option key={t} value={t} style={{ background: '#1a1b23', textTransform: 'capitalize' }}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div style={{ flex: '0 1 130px', minWidth: '110px' }}>
                     <label style={labelStyle}>Entrega Contado</label>
                     <input
                       type="text" inputMode="numeric" placeholder="0"
-                      value={e.delivery}
+                      value={fieldVal(op, 'delivery')}
                       onChange={(ev) => setField(op.id, 'delivery', formatMoney(ev.target.value))}
                       style={inputStyle}
                     />
@@ -159,7 +191,7 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
                     <label style={labelStyle}>Cuotas</label>
                     <input
                       type="number" min="0" placeholder="0"
-                      value={e.installments}
+                      value={fieldVal(op, 'installments')}
                       onChange={(ev) => setField(op.id, 'installments', ev.target.value)}
                       style={inputStyle}
                     />
@@ -168,7 +200,7 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
                     <label style={labelStyle}>Monto Crédito</label>
                     <input
                       type="text" inputMode="numeric" placeholder="0"
-                      value={e.credit}
+                      value={fieldVal(op, 'credit')}
                       onChange={(ev) => setField(op.id, 'credit', formatMoney(ev.target.value))}
                       style={inputStyle}
                     />

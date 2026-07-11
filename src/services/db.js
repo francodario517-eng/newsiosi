@@ -348,19 +348,25 @@ export const db = {
     });
   },
 
-  // Carga rápida: actualiza SOLO los campos financieros de una operación
-  // (entrega contado, cuotas, monto crédito). No toca los vehículos ni corre
-  // la validación de compra duplicada, así que es mucho más liviano/rápido que
-  // updateOperation. Pensado para completar en lote datos faltantes.
-  updateOperationFinancials: async (id, { delivery_amount, installments, credit_amount }) => {
+  // Carga rápida: actualiza solo algunos campos de una operación
+  // (fecha, tipo, entrega contado, cuotas, monto crédito). No toca los
+  // vehículos ni corre la validación de compra duplicada, así que es mucho
+  // más liviano/rápido que updateOperation. Pensado para completar/corregir
+  // datos en lote. Solo se envían a la base los campos efectivamente pasados.
+  updateOperationQuick: async (id, fields) => {
+    const payload = {};
+    if ('delivery_amount' in fields) payload.delivery_amount = fields.delivery_amount || 0;
+    if ('installments' in fields) payload.installments = fields.installments || 0;
+    if ('credit_amount' in fields) payload.credit_amount = fields.credit_amount || 0;
+    if ('operation_type' in fields && fields.operation_type) payload.operation_type = fields.operation_type;
+    // La fecha llega como dd/mm/yyyy (igual que en el resto de la app) y se
+    // guarda como yyyy-mm-dd, tal cual hace updateOperation/addOperation.
+    if ('date' in fields && fields.date) payload.date = fields.date.split('/').reverse().join('-');
+
     return withMutation(async () => {
       const { data, error } = await supabase
         .from('operations')
-        .update({
-          delivery_amount: delivery_amount || 0,
-          installments: installments || 0,
-          credit_amount: credit_amount || 0
-        })
+        .update(payload)
         .eq('id', id)
         .select()
         .single();
