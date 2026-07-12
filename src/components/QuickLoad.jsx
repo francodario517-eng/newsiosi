@@ -5,7 +5,9 @@ import { Check, Loader, Zap, Search, CheckCircle2 } from 'lucide-react';
 // para las operaciones que todavía no tienen esos datos cargados (todo en 0).
 // Cada fila es un mini-formulario: escribís los 3 valores y guardás (o Enter).
 // Al guardar, la operación deja de tener valores en 0 y desaparece de la lista.
-const PAYMENT_TYPES = ['contado', 'crédito'];
+// El tipo de pago se deriva automáticamente de las cuotas:
+// con cuotas (> 0) => crédito; sin cuotas => contado.
+const pagoFromCuotas = (installments) => ((Number(installments) || 0) > 0 ? 'crédito' : 'contado');
 
 // Normaliza cualquier fecha (dd/mm/yyyy legacy o yyyy-mm-dd) al formato
 // yyyy-mm-dd que necesita <input type="date">, con ceros a la izquierda.
@@ -49,7 +51,6 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
     const e = edits[op.id];
     if (e && field in e) return e[field];
     if (field === 'date') return toDateInput(op.date);
-    if (field === 'pago') return (op.payment_type || 'contado').toLowerCase();
     return '';
   };
 
@@ -61,13 +62,14 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
     if (savingId) return;
     const dateInput = fieldVal(op, 'date'); // yyyy-mm-dd
     const [yy, mm, dd] = dateInput.split('-');
+    const installments = Number(fieldVal(op, 'installments')) || 0;
     setSavingId(op.id);
     try {
       await onSave(op.id, {
         date: dateInput ? `${dd}/${mm}/${yy}` : undefined, // db lo guarda como yyyy-mm-dd
-        payment_type: fieldVal(op, 'pago'),
+        payment_type: pagoFromCuotas(installments), // auto: con cuotas => crédito, sin cuotas => contado
         delivery_amount: parseMoney(fieldVal(op, 'delivery')),
-        installments: Number(fieldVal(op, 'installments')) || 0,
+        installments,
         credit_amount: parseMoney(fieldVal(op, 'credit'))
       });
       setSavedCount(c => c + 1);
@@ -174,16 +176,24 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
                     />
                   </div>
                   <div style={{ flex: '0 1 120px', minWidth: '110px' }}>
-                    <label style={labelStyle}>Pago</label>
-                    <select
-                      value={fieldVal(op, 'pago')}
-                      onChange={(ev) => setField(op.id, 'pago', ev.target.value)}
-                      style={{ ...inputStyle, textTransform: 'capitalize' }}
-                    >
-                      {PAYMENT_TYPES.map(t => (
-                        <option key={t} value={t} style={{ background: '#1a1b23', textTransform: 'capitalize' }}>{t}</option>
-                      ))}
-                    </select>
+                    <label style={labelStyle}>Pago (auto)</label>
+                    {(() => {
+                      const pago = pagoFromCuotas(fieldVal(op, 'installments'));
+                      const esCredito = pago === 'crédito';
+                      return (
+                        <div
+                          title="Se define solo según las cuotas"
+                          style={{
+                            ...inputStyle, display: 'flex', alignItems: 'center', textTransform: 'capitalize',
+                            border: '1px dashed var(--border)', cursor: 'default',
+                            color: esCredito ? '#aa3bff' : 'var(--text-muted)',
+                            background: esCredito ? 'rgba(170, 59, 255, 0.08)' : 'rgba(255,255,255,0.02)'
+                          }}
+                        >
+                          {pago}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div style={{ flex: '0 1 130px', minWidth: '110px' }}>
                     <label style={labelStyle}>Entrega Contado</label>
