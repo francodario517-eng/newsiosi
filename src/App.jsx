@@ -478,6 +478,12 @@ function App() {
     if (op) handleSelectOperation(op);
   }
 
+  // Ver el árbol desde la tabla de rendimiento por árbol (Analítica)
+  const handleSelectTree = (tree) => {
+    const op = operations.find(o => o.id === tree.id);
+    if (op) handleSelectOperation(op);
+  }
+
   const handleOpenBranchModal = (vehicleInfo) => {
     setPreFilledData({
       description: vehicleInfo.description,
@@ -1389,9 +1395,11 @@ function App() {
             </div>
           )}
           {activeTab === 'stats' && (
-            <StatsDashboard 
-              metrics={financials.getGlobalMetrics(operations, filteredOperations)} 
+            <StatsDashboard
+              metrics={financials.getGlobalMetrics(operations, filteredOperations)}
+              trees={financials.getTreesOverview(operations)}
               stock={stockVehicles}
+              onSelectTree={handleSelectTree}
             />
           )}
 
