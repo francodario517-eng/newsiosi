@@ -38,6 +38,15 @@ import { apifyService } from './services/apify'
 // Email autorizado a usar la Carga Rápida de datos financieros.
 const QUICKLOAD_EMAIL = 'francodario517@gmail.com'
 
+// Vehículo desde el que se arma el árbol de una operación: el principal, o el
+// primero si la operación no tiene principal. getVehicleTraceability no da el
+// mismo resultado según desde qué vehículo se lo llame, así que la pantalla del
+// árbol y el Excel de inventario tienen que arrancar siempre del mismo lugar.
+const getTreeSeedId = (op) => {
+  const principal = (op?.vehicles || []).find(v => v && v.role === 'principal') || op?.vehicles?.[0];
+  return principal?.chasis?.trim() || principal?.chapa?.trim() || '';
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'operations')
   const [selectedTraceability, setSelectedTraceability] = useState(null)
@@ -417,8 +426,7 @@ function App() {
         // Find a vehicle from any operation that matches the highlightedId
         const op = operations.find(o => o.id === highlightedId || o.vehicles.some(v => v.chasis === highlightedId || v.chapa === highlightedId));
         if (op) {
-          const principalV = (op.vehicles || []).find(v => v.role === 'principal') || op.vehicles?.[0];
-          const vehicleId = principalV?.chasis?.trim() || principalV?.chapa?.trim();
+          const vehicleId = getTreeSeedId(op);
           if (vehicleId) {
             const isFreshSelection = lastLoadedTreeIdRef.current !== highlightedId;
             if (isFreshSelection) setIsTreeLoading(true);
@@ -443,8 +451,7 @@ function App() {
   }, [operations, activeTab, highlightedId]);
 
   const handleSelectOperation = async (op) => {
-    const principalVehicle = (op.vehicles || []).find(v => v.role === 'principal') || op.vehicles?.[0];
-    const vehicleId = principalVehicle?.chasis?.trim() || principalVehicle?.chapa?.trim();
+    const vehicleId = getTreeSeedId(op);
 
     setHighlightedId(op.id);
     setActiveTab('tree');
@@ -920,10 +927,16 @@ function App() {
     try {
       const formatNum = (v) => v ? Number(v) : 0;
 
-      // Cache de árboles ya calculados por vehículo (evita recalcular si dos filas comparten chasis/chapa)
+      // Cache de árboles ya calculados (evita recalcular si varias filas salen del mismo árbol)
       const profitCache = new Map();
       const getEstimatedProfit = async (item) => {
-        const lookupId = (item.chasis || '').trim() || (item.chapa || '').trim();
+        // El árbol se arma igual que en el botón "Ver árbol" de esta fila: desde
+        // el vehículo principal de la operación donde entró el auto. Antes se
+        // armaba desde el chasis del propio auto en stock, y en una parte de pago
+        // eso es otro vehículo: el Excel mostraba una ganancia distinta a la del
+        // árbol en pantalla. Si la operación no aparece, queda el criterio viejo.
+        const sourceOp = operations.find(o => o.id === item.operation_id);
+        const lookupId = getTreeSeedId(sourceOp) || (item.chasis || '').trim() || (item.chapa || '').trim();
         if (!lookupId) return '';
         if (profitCache.has(lookupId)) return profitCache.get(lookupId);
         try {
