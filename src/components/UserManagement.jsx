@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { db, supabase } from '../services/db';
-import { Users, Shield, Edit3, Trash2, Check, X, Loader, UserPlus } from 'lucide-react';
-
-import { createClient } from '@supabase/supabase-js';
+import { Users, Shield, Edit3, Trash2, Check, X, Loader, UserPlus, Eye } from 'lucide-react';
 
 export function UserManagement() {
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', password: '', is_admin: false, can_edit: true, can_delete: false });
+  const [newUser, setNewUser] = useState({ email: '', password: '', is_admin: false, can_view: true, can_edit: true, can_delete: false });
   const [isCreating, setIsCreating] = useState(false);
 
   const loadProfiles = async () => {
@@ -37,55 +35,42 @@ export function UserManagement() {
   };
 
   const handleAddUser = () => {
-    setNewUser({ email: '', password: '', is_admin: false, can_edit: true, can_delete: false });
+    setNewUser({ email: '', password: '', is_admin: false, can_view: true, can_edit: true, can_delete: false });
     setShowAddModal(true);
   };
 
   const handleSaveUser = async (e) => {
     e.preventDefault();
-    if (newUser.password.length < 6) {
-      alert("La contraseña debe tener al menos 6 caracteres");
+    if (newUser.password.length < 8) {
+      alert("La contraseña debe tener al menos 8 caracteres");
       return;
     }
 
     setIsCreating(true);
     try {
-      // Usamos un cliente temporal sin persistencia de sesión para no desloguear al admin actual
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const tempClient = createClient(supabaseUrl, supabaseKey, {
-        auth: { persistSession: false }
+      // La cuenta la crea el servidor (api/crear-usuario), que comprueba que
+      // quien lo pide sea administrador. El registro público queda cerrado.
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch('/api/crear-usuario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({
+          email: newUser.email.trim(),
+          password: newUser.password,
+          is_admin: newUser.is_admin,
+          can_view: newUser.can_view,
+          can_edit: newUser.can_edit,
+          can_delete: newUser.can_delete,
+        }),
       });
+      const result = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(result.error || `Error ${r.status}`);
 
-      const { data, error } = await tempClient.auth.signUp({
-        email: newUser.email.trim(),
-        password: newUser.password,
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        // Usamos upsert para asegurar que se cree el perfil si el trigger de la DB falla
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: data.user.id,
-            email: newUser.email,
-            is_admin: newUser.is_admin,
-            can_edit: newUser.can_edit,
-            can_delete: newUser.can_delete
-          });
-
-        if (profileError) {
-          console.warn('Error al crear perfil inicial (posiblemente ya existe):', profileError);
-        }
-        
-        alert(`Usuario ${newUser.email} registrado. Si el usuario no aparece de inmediato, pídale que confirme su correo electrónico (si está habilitada la confirmación en Supabase).`);
-        setShowAddModal(false);
-        setNewUser({ email: '', password: '', is_admin: false, can_edit: true, can_delete: false });
-        await loadProfiles();
-        db.notify(); // Notificar cambios
-      }
+      alert(`Usuario ${result.email} creado. Ya puede iniciar sesión con la contraseña que cargaste.`);
+      setShowAddModal(false);
+      setNewUser({ email: '', password: '', is_admin: false, can_view: true, can_edit: true, can_delete: false });
+      await loadProfiles();
+      db.notify(); // Notificar cambios
     } catch (error) {
       console.error('Error al crear usuario:', error);
       alert('Error: ' + (error.message || 'No se pudo crear el usuario'));
@@ -141,6 +126,7 @@ export function UserManagement() {
             <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', background: 'rgba(255,255,255,0.02)' }}>
               <th style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>Usuario</th>
               <th style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', textAlign: 'center' }}>Admin</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', textAlign: 'center' }}>Puede Ver</th>
               <th style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', textAlign: 'center' }}>Puede Editar</th>
               <th style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', textAlign: 'center' }}>Puede Borrar</th>
             </tr>
@@ -163,6 +149,20 @@ export function UserManagement() {
                     }}
                   >
                     <Shield size={20} />
+                  </button>
+                </td>
+
+                <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                  <button 
+                    onClick={() => handleToggle(profile.id, 'can_view', profile.can_view)}
+                    disabled={updating === profile.id}
+                    title="Puede ver los datos (editar, borrar o ser administrador también lo incluyen)"
+                    style={{ 
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: profile.can_view ? '#a3e635' : 'rgba(255,255,255,0.1)'
+                    }}
+                  >
+                    <Eye size={20} />
                   </button>
                 </td>
 
@@ -199,7 +199,7 @@ export function UserManagement() {
       
       <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(170, 59, 255, 0.05)', borderRadius: '12px', border: '1px border var(--border)' }}>
         <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Shield size={14} /> Los permisos se aplican instantáneamente tras cada cambio.
+          <Shield size={14} /> Los permisos los controla la base de datos y se aplican al instante. Una cuenta sin «Puede ver» no ve ningún dato.
         </p>
       </div>
 
@@ -232,7 +232,7 @@ export function UserManagement() {
                   autoComplete="new-password"
                   value={newUser.password}
                   onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                  placeholder="Min. 6 caracteres"
+                  placeholder="Mín. 8 caracteres"
                 />
               </div>
 
@@ -245,6 +245,10 @@ export function UserManagement() {
                     Administrador (Control Total)
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'white', cursor: 'pointer', fontSize: '14px' }}>
+                    <input type="checkbox" checked={newUser.can_view} onChange={(e) => setNewUser({...newUser, can_view: e.target.checked})} />
+                    Puede Ver Datos
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'white', cursor: 'pointer', fontSize: '14px' }}>
                     <input type="checkbox" checked={newUser.can_edit} onChange={(e) => setNewUser({...newUser, can_edit: e.target.checked})} />
                     Puede Editar Datos
                   </label>
@@ -253,9 +257,9 @@ export function UserManagement() {
                     Puede Borrar Registros
                   </label>
                 </div>
-                {!newUser.can_edit && !newUser.is_admin && (
-                  <p style={{ margin: '12px 0 0 0', fontSize: '11px', color: '#60a5fa' }}>
-                    * El usuario tendrá acceso de <b>Solo Lectura</b>.
+                {!newUser.can_edit && !newUser.is_admin && !newUser.can_delete && (
+                  <p style={{ margin: '12px 0 0 0', fontSize: '11px', color: newUser.can_view ? '#60a5fa' : '#ef4444' }}>
+                    {newUser.can_view ? <>* El usuario tendrá acceso de <b>Solo Lectura</b>.</> : <>* El usuario <b>no verá ningún dato</b> hasta que lo habilites.</>}
                   </p>
                 )}
               </div>
