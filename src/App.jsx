@@ -404,8 +404,9 @@ function App() {
           setUserProfile(profile);
         }
       } catch (error) {
+        // Si la lectura falla, se conserva lo que ya estaba en pantalla (antes
+        // un error dejaba la lista vacía) y la próxima recarga lo reintenta.
         console.error('Error in loadAll:', error);
-        // This prevents the critical crash error boundary from showing up
       }
     };
     loadAll();
