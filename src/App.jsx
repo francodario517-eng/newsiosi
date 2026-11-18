@@ -64,6 +64,9 @@ function App() {
   const [isTreeLoading, setIsTreeLoading] = useState(false)
   const [session, setSession] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
+  // Puede ver los datos: la base lo exige (db/2026-11-18-permisos-en-la-base.sql).
+  // can_view todavía sin definir = perfil anterior a esa migración, que veía todo.
+  const hasViewAccess = !!userProfile && (userProfile.is_admin || userProfile.can_edit || userProfile.can_delete || userProfile.can_view !== false)
   const [editingOperation, setEditingOperation] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const savingRef = React.useRef(false)
@@ -1157,7 +1160,7 @@ function App() {
           <div className="glass" style={{ padding: '16px', borderRadius: '14px', marginBottom: '16px', background: 'rgba(255,255,255,0.02)', border: !userProfile ? '1px solid #ef4444' : '1px solid transparent' }}>
             <div style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
               <span>Sesión activa</span>
-              <span style={{ color: userProfile?.can_edit ? '#10b981' : '#ef4444' }}>{userProfile ? (userProfile.can_edit ? 'MODO EDITOR' : 'MODO LECTURA') : 'PERFIL NO ENCONTRADO'}</span>
+              <span style={{ color: userProfile?.can_edit ? '#10b981' : '#ef4444' }}>{userProfile ? (userProfile.can_edit ? 'MODO EDITOR' : hasViewAccess ? 'MODO LECTURA' : 'SIN ACCESO') : 'PERFIL NO ENCONTRADO'}</span>
             </div>
             <div style={{ color: 'white', fontWeight: 'bold', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{session?.user?.email}</div>
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'monospace' }}>ID: {session?.user?.id}</div>
@@ -1179,6 +1182,11 @@ function App() {
           <div className="animate-in" style={{ flex: 'none', width: '100%', marginBottom: '4px' }}>
             <h1 className="h1-responsive">{activeTab === 'operations' ? 'Operaciones' : activeTab === 'stock' ? 'Inventario' : activeTab === 'tree' ? 'Trazabilidad' : activeTab === 'quickload' ? 'Carga Rápida' : 'Analítica'}</h1>
             <h2 style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>{activeTab === 'operations' ? 'Gestión de transacciones' : activeTab === 'stock' ? 'Vehículos en stock' : activeTab === 'tree' ? 'Cadena de valor' : activeTab === 'quickload' ? 'Completar entrega, cuotas y crédito' : 'KPIs Financieros'}</h2>
+            {userProfile && !hasViewAccess && (
+              <div style={{ marginTop: '12px', padding: '12px 16px', borderRadius: '12px', border: '1px solid #ef4444', background: 'rgba(239,68,68,0.08)', color: 'white', fontSize: '14px' }}>
+                Tu usuario todavía no tiene acceso a los datos. Pedile a un administrador que te habilite en «Usuarios».
+              </div>
+            )}
           </div>
 
           <div className="tools-bar" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', flex: '1 1 auto' }}>
