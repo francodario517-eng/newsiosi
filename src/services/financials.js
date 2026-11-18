@@ -1,3 +1,5 @@
+import { lineageRoots } from './lineage.js';
+
 /**
  * Financial analysis logic for the Vehicle Tracking System.
  * Calculates realized and estimated profit across commercial chains.
@@ -132,33 +134,14 @@ export const financials = {
       return isNaN(p.getTime()) ? new Date(0) : p;
     };
 
-    // Union-Find para agrupar operaciones en cadenas conectadas.
-    const idIndex = new Map();
-    ops.forEach((op, i) => idIndex.set(op.id, i));
-    const parent = ops.map((_, i) => i);
-    const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
-    const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
-
-    // Unir operaciones que comparten un mismo vehículo (por chasis/chapa)…
-    const vehToOps = new Map();
-    ops.forEach((op, i) => {
-      (op.vehicles || []).forEach(v => {
-        const id = norm(v);
-        if (!id) return;
-        if (!vehToOps.has(id)) vehToOps.set(id, []);
-        vehToOps.get(id).push(i);
-      });
-    });
-    vehToOps.forEach(list => { for (let k = 1; k < list.length; k++) union(list[0], list[k]); });
-    // …y las enlazadas por parent_id.
-    ops.forEach((op, i) => {
-      const pid = op.parent_id || op.parentId;
-      if (pid && idIndex.has(pid)) union(i, idIndex.get(pid));
-    });
-
+    // Las cadenas se arman con el mismo linaje que el árbol en pantalla
+    // (services/lineage.js). Antes se unía todo lo que compartiera un vehículo:
+    // un auto que se compró, se vendió y años después volvió como parte de pago
+    // juntaba dos cadenas distintas en una sola.
+    const roots = lineageRoots(ops);
     const groups = new Map();
-    ops.forEach((op, i) => {
-      const r = find(i);
+    ops.forEach(op => {
+      const r = roots.get(op.id);
       if (!groups.has(r)) groups.set(r, []);
       groups.get(r).push(op);
     });

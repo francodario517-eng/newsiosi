@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { vehKey, resolveLineageCached, lineageRoots } from './lineage.js';
 
 // Configuration from environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -376,120 +377,43 @@ export const db = {
     });
   },
 
-  getVehicleTraceability: async (vehicleId, allOps = null) => {
+  // Árbol (cadena) de un vehículo. seedOpId, si viene, es la operación desde la
+  // que se pidió el árbol: un mismo auto puede estar en más de una cadena (se
+  // compró, se vendió y años después volvió como parte de pago de otro trato), y
+  // hay que mostrar la cadena de ESA operación, no la de cualquiera que tenga el
+  // auto.
+  getVehicleTraceability: async (vehicleId, allOps = null, seedOpId = null) => {
     if (!allOps) allOps = await db.getOperations();
     if (!allOps || allOps.length === 0) return { nodes: [], edges: [] };
 
-    const getVehId = (v) => (v && stripSpaces(v.chasis || v.chapa).toUpperCase()) || '';
-    const searchId = vehicleId.trim().toUpperCase();
+    const getVehId = (v) => vehKey(v);
+    const searchId = stripSpaces(vehicleId).toUpperCase();
 
-    // 1. Initial set: ops containing search vehicleId
-    let treeOps = allOps.filter(op => (op.vehicles || []).some(v => getVehId(v) === searchId));
-    
-    // 2. Expand recursively in memory
-    let changed = true;
-    while (changed) {
-      changed = false;
-      const currentIds = new Set(treeOps.map(o => o.id));
-      
-      allOps.forEach(op => {
-        if (currentIds.has(op.id)) {
-          // A. Upward Expansion (Parents)
-          if (op.parent_id && !currentIds.has(op.parent_id)) {
-            const p = allOps.find(o => o.id === op.parent_id);
-            if (p) { treeOps.push(p); changed = true; }
-          }
-          const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
-          if (principal) {
-            const pId = getVehId(principal);
-            if (pId) {
-              const smartParent = allOps.find(o => !currentIds.has(o.id) && (
-                (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId) ||
-                ((o.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === 'compra' ||
-                  o.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === 'rescision') &&
-                 (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === pId))
-              ));
-              if (smartParent) { treeOps.push(smartParent); changed = true; }
-            }
-          }
+    // 1. Linaje de todas las operaciones (de qué operación viene cada una).
+    //    Nunca cuelga una operación de otra posterior: ver services/lineage.js.
+    const lineage = resolveLineageCached(allOps);
+    const roots = lineageRoots(allOps, lineage);
 
-          // B. Downward Expansion (Children)
-          const children = allOps.filter(o => o.parent_id === op.id && !currentIds.has(o.id));
-          if (children.length > 0) { treeOps.push(...children); changed = true; }
-          
-          const tradeIns = (op.vehicles || []).filter(v => v && v.role === 'parte_pago');
-          tradeIns.forEach(t => {
-            const tId = getVehId(t);
-            if (!tId) return;
-            const smartChild = allOps.find(o => !currentIds.has(o.id) && (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === tId));
-            if (smartChild) { treeOps.push(smartChild); changed = true; }
-          });
+    // 2. Operación de partida y su cadena.
+    const searchedOp =
+      (seedOpId && allOps.find(op => op.id === seedOpId)) ||
+      allOps.find(op => (op.vehicles || []).some(v => getVehId(v) === searchId));
+    if (!searchedOp) return { nodes: [], edges: [] };
+    const targetRoot = roots.get(searchedOp.id);
+    const relevantOps = allOps.filter(op => roots.get(op.id) === targetRoot);
 
-          const opTypeClean = op.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          if (opTypeClean === 'compra' || opTypeClean === 'rescision') {
-             const vId = getVehId(principal);
-             if (vId) {
-               const smartChild = allOps.find(o => !currentIds.has(o.id) && o.operation_type?.toLowerCase() === 'venta' && (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === vId));
-               if (smartChild) { treeOps.push(smartChild); changed = true; }
-             }
-          }
-        }
-      });
-      if (currentIds.size === treeOps.length) changed = false;
-    }
-
-    const ops = treeOps;
     const opMap = new Map();
-    ops.forEach(op => {
+    relevantOps.forEach(op => {
       opMap.set(op.id, { ...op, children: [], depth: 0 });
     });
-
-    // Un mismo veh\u00edculo puede entrar como parte de pago m\u00e1s de una vez a lo
-    // largo de su historia (se vende, y m\u00e1s tarde vuelve a entregarse como
-    // parte de pago de otra operaci\u00f3n). Entre varios candidatos a "padre",
-    // elegimos el evento de entrada cronol\u00f3gicamente m\u00e1s cercano (el \u00faltimo
-    // antes o en la fecha de esta operaci\u00f3n), no el primero que aparezca en
-    // el arreglo, para no cortar la cadena real en dos \u00e1rboles separados.
-    const opTime = (o) => {
-      const t = new Date(o.date).getTime();
-      return isNaN(t) ? 0 : t;
-    };
-    const closestBefore = (candidates, refTime) => {
-      if (candidates.length === 0) return null;
-      const before = candidates.filter(o => opTime(o) <= refTime);
-      const pool = before.length > 0 ? before : candidates;
-      return pool.reduce((best, o) => (opTime(o) > opTime(best) ? o : best), pool[0]);
-    };
-
-    ops.forEach(op => {
-      const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
-      const pId = getVehId(principal);
-      const refTime = opTime(op);
-
-      let parentId = op.parent_id;
-      if (!parentId && pId) {
-        const parteDePagoCandidates = ops.filter(o => o.id !== op.id && (o.vehicles || []).some(v => v && v.role === 'parte_pago' && getVehId(v) === pId));
-        let smartParent = closestBefore(parteDePagoCandidates, refTime);
-
-        const opType = op.operation_type?.toLowerCase();
-        if (!smartParent && (opType === 'venta' || opType === 'remate')) {
-          const compraCandidates = ops.filter(o => {
-            const pType = o.operation_type?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            return (pType === 'compra' || pType === 'rescision') && (o.vehicles || []).some(v => v && v.role === 'principal' && getVehId(v) === pId);
-          });
-          smartParent = closestBefore(compraCandidates, refTime);
-        }
-
-        if (smartParent) parentId = smartParent.id;
-      }
-
-      if (parentId && opMap.has(parentId)) {
-        opMap.get(parentId).children.push(op.id);
-        opMap.get(op.id).effectiveParentId = parentId;
+    relevantOps.forEach(op => {
+      const link = lineage.get(op.id);
+      if (link && opMap.has(link.parentId)) {
+        opMap.get(link.parentId).children.push(op.id);
+        opMap.get(op.id).effectiveParentId = link.parentId;
+        opMap.get(op.id).viaVehicle = link.viaVehicle;
       }
     });
-
-    const roots = ops.filter(op => !opMap.get(op.id).effectiveParentId);
 
     const visited = new Set();
     const setDepth = (id, depth) => {
@@ -499,36 +423,15 @@ export const db = {
       entry.depth = Math.max(entry.depth, depth);
       entry.children.forEach(childId => setDepth(childId, depth + 1));
     };
-    roots.forEach(r => setDepth(r.id, 0));
+    if (opMap.has(targetRoot)) setDepth(targetRoot, 0);
 
-    // La expansión puede traer más de un árbol desconectado (p. ej. un
-    // vehículo recibido como parte de pago que tiene su propia historia de
-    // compra completamente separada). Un árbol con compra/rescisión propia
-    // es autocontenido: nunca se combina con otro árbol distinto, aunque
-    // ambos hayan quedado en el mismo resultado de la búsqueda. Nos
-    // quedamos únicamente con el árbol que contiene el vehículo buscado.
-    const treeIndexOf = new Map();
-    roots.forEach((root, idx) => {
-      const stack = [root.id];
-      while (stack.length) {
-        const id = stack.pop();
-        if (treeIndexOf.has(id)) continue;
-        treeIndexOf.set(id, idx);
-        opMap.get(id).children.forEach(childId => stack.push(childId));
-      }
-    });
-
-    const searchedOp = ops.find(op => (op.vehicles || []).some(v => getVehId(v) === searchId));
-    const targetTreeIdx = searchedOp ? treeIndexOf.get(searchedOp.id) : 0;
-    const relevantOps = ops.filter(op => treeIndexOf.get(op.id) === targetTreeIdx);
-
+    // Vehículos que ya salieron de cada operación hacia otra de la cadena
+    // (clave "<operación>-<vehículo>"): el auto con el que se armó el vínculo.
     const soldInChain = new Set();
     relevantOps.forEach(op => {
-      const epId = opMap.get(op.id).effectiveParentId;
-      if (epId) {
-        const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
-        const vId = getVehId(principal);
-        if (vId) soldInChain.add(`${epId}-${vId}`);
+      const entry = opMap.get(op.id);
+      if (entry.effectiveParentId && entry.viaVehicle) {
+        soldInChain.add(`${entry.effectiveParentId}-${entry.viaVehicle}`);
       }
     });
 
