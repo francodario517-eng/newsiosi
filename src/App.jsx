@@ -431,7 +431,7 @@ function App() {
             const isFreshSelection = lastLoadedTreeIdRef.current !== highlightedId;
             if (isFreshSelection) setIsTreeLoading(true);
             try {
-              const trace = await db.getVehicleTraceability(vehicleId, operations);
+              const trace = await db.getVehicleTraceability(vehicleId, operations, op.id);
               if (!cancelled) {
                 setSelectedTraceability(trace);
                 setStats(financials.getTreeStats(trace));
@@ -469,7 +469,7 @@ function App() {
 
     setIsTreeLoading(true);
     try {
-      const trace = await db.getVehicleTraceability(vehicleId, operations);
+      const trace = await db.getVehicleTraceability(vehicleId, operations, op.id);
       setSelectedTraceability(trace);
       setStats(financials.getTreeStats(trace));
     } catch (err) {
@@ -938,11 +938,13 @@ function App() {
         const sourceOp = operations.find(o => o.id === item.operation_id);
         const lookupId = getTreeSeedId(sourceOp) || (item.chasis || '').trim() || (item.chapa || '').trim();
         if (!lookupId) return '';
-        if (profitCache.has(lookupId)) return profitCache.get(lookupId);
+        // Un mismo auto puede estar en más de una cadena: la clave es la operación.
+        const cacheKey = sourceOp?.id || lookupId;
+        if (profitCache.has(cacheKey)) return profitCache.get(cacheKey);
         try {
-          const trace = await db.getVehicleTraceability(lookupId, operations);
+          const trace = await db.getVehicleTraceability(lookupId, operations, sourceOp?.id);
           const stats = financials.getTreeStats(trace);
-          profitCache.set(lookupId, stats.totalProfit);
+          profitCache.set(cacheKey, stats.totalProfit);
           return stats.totalProfit;
         } catch (e) {
           return '';
