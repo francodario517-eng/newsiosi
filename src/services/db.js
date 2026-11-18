@@ -127,19 +127,55 @@ export const db = {
     }
   },
 
-  getOperations: async () => {
-    const { data, error } = await supabase
-      .from('operations')
-      .select('*, vehicles(*)')
-      .order('date', { ascending: false });
+  // ─────────────────────────────────────────────────────────────────────────
+  // Lee TODAS las operaciones en lotes. Supabase corta cada respuesta en
+  // "Max rows" (1.000 por defecto) sin avisar, y antes la app hacía una sola
+  // lectura: pasando las 1.000 operaciones, las más viejas desaparecían de la
+  // pantalla, del árbol y de los cálculos.
+  //
+  // - Se avanza por id (id > último leído), no por posición: si alguien carga o
+  //   borra una operación mientras se lee, no se saltea ni se repite ninguna.
+  // - Se sigue hasta que un lote vuelve VACÍO, no "hasta que vuelva corto": si
+  //   Max rows se configura por debajo de PAGE, igual se lee todo.
+  // - Si un lote falla, se lanza el error en vez de devolver una lista parcial
+  //   o vacía; la pantalla conserva lo que ya mostraba.
+  // ─────────────────────────────────────────────────────────────────────────
+  OPERATIONS_PAGE: 1000,
 
-    if (error) {
-      console.error('Error fetching operations:', error);
-      return [];
+  getOperations: async () => {
+    const all = [];
+    const seen = new Set();
+    let lastId = null;
+    for (let guard = 0; guard < 10000; guard++) {
+      let q = supabase
+        .from('operations')
+        .select('*, vehicles(*)')
+        .order('id', { ascending: true })
+        .limit(db.OPERATIONS_PAGE);
+      if (lastId !== null) q = q.gt('id', lastId);
+
+      const { data, error } = await q;
+      if (error) {
+        console.error('Error leyendo operaciones:', error);
+        throw error;
+      }
+      if (!data || data.length === 0) break;
+      data.forEach(op => {
+        if (seen.has(op.id)) return;
+        seen.add(op.id);
+        all.push(op);
+      });
+      lastId = data[data.length - 1].id;
     }
 
+    // Orden de pantalla: fecha más reciente primero; a igual fecha, la última cargada.
+    all.sort((a, b) =>
+      String(b.date || '').localeCompare(String(a.date || '')) ||
+      String(b.created_at || '').localeCompare(String(a.created_at || ''))
+    );
+
     // Map snake_case to camelCase for the UI
-    return data.map(op => ({
+    return all.map(op => ({
       ...op,
       parentId: op.parent_id,
       vehicles: op.vehicles || []
