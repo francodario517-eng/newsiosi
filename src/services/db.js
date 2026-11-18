@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { vehKey, resolveLineageCached, lineageRoots } from './lineage.js';
+import { vehKey, opType, opTime, resolveLineageCached, lineageRoots } from './lineage.js';
+import { assertValidOperation, parseOpDate } from './validation.js';
 
 // Configuration from environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -19,10 +20,12 @@ const stripSpaces = (str) => (str || '').replace(/\s+/g, '');
 const listeners = new Set();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Flag para suprimir el notify de Realtime cuando la mutación fue local.
-// Evita el double-fetch: mutación local → notify() + Realtime → notify() x2.
+// Realtime: antes, durante 3 s después de cada guardado propio se ignoraban
+// TODOS los cambios (también los de otros usuarios). Ahora no se ignora nada:
+// los avisos se agrupan (notify con debounce) para no recargar varias veces
+// por una misma mutación, y App descarta respuestas viejas de getOperations.
 // ─────────────────────────────────────────────────────────────────────────────
-let _isMutating = false;
+let _notifyTimer = null;
 let _realtimeChannel = null;
 let _realtimeStatus = 'CONNECTING'; // 'CONNECTED' | 'ERROR' | 'DISCONNECTED' | 'CONNECTING'
 const _statusListeners = new Set();
@@ -52,24 +55,12 @@ const buildRealtimeChannel = () => {
   _realtimeChannel = supabase
     .channel('realtime_changes_v2')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'operations' }, () => {
-      if (_isMutating) {
-        console.log('[Realtime] Skipping notify — local mutation in progress.');
-        return;
-      }
-      console.log('[Realtime] Change detected in operations → notifying listeners');
       db.notify();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles' }, () => {
-      if (_isMutating) {
-        console.log('[Realtime] Skipping notify — local mutation in progress.');
-        return;
-      }
-      console.log('[Realtime] Change detected in vehicles → notifying listeners');
       db.notify();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-      if (_isMutating) return;
-      console.log('[Realtime] Change detected in profiles → notifying listeners');
       db.notify();
     })
     .subscribe((status, err) => {
@@ -94,22 +85,20 @@ const buildRealtimeChannel = () => {
   return _realtimeChannel;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper: ejecuta una mutación marcando _isMutating para suprimir el
-// notify redundante de Realtime. Luego notifica manualmente UNA sola vez.
-// ─────────────────────────────────────────────────────────────────────────────
+// Ejecuta una mutación y avisa a la pantalla para que recargue.
 const withMutation = async (fn) => {
-  _isMutating = true;
-  try {
-    const result = await fn();
-    // Notificar manualmente (el notify de Realtime llegará suprimido)
-    db.notify();
-    return result;
-  } finally {
-    // Liberar el flag después de 3s para no bloquear notificaciones ajenas
-    setTimeout(() => { _isMutating = false; }, 3000);
-  }
+  const result = await fn();
+  db.notify();
+  return result;
 };
+
+const vehicleRow = (v) => ({
+  chapa: stripSpaces(v.chapa),
+  chasis: stripSpaces(v.chasis),
+  description: v.description,
+  role: v.role,
+  valuation: v.valuation || 0,
+});
 
 export const db = {
   subscribe: (callback) => {
@@ -126,7 +115,8 @@ export const db = {
   getRealtimeStatus: () => _realtimeStatus,
 
   notify: () => {
-    listeners.forEach(cb => cb());
+    clearTimeout(_notifyTimer);
+    _notifyTimer = setTimeout(() => listeners.forEach(cb => cb()), 250);
   },
 
   // Forzar reconexión del canal (útil para heartbeat desde App.jsx)
@@ -157,67 +147,76 @@ export const db = {
   },
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Un mismo vehículo (por chasis o chapa) puede volver a comprarse de forma
-  // legítima si ya fue vendido (recompra / vuelve como parte de pago). Solo
-  // es un error real si esa compra anterior sigue en stock sin vender.
+  // Compra de un auto que ya está en stock = probable duplicado.
+  // Se mira el estado del auto a la fecha de la nueva compra: entradas
+  // (compra/rescisión, parte de pago recibida) contra salidas (venta/remate,
+  // parte de pago entregada en una compra). Antes sólo contaba como salida una
+  // venta, así que recomprar un auto que se había entregado como parte de pago
+  // quedaba bloqueado. Sólo trae las operaciones de ese auto, no toda la base.
   // ─────────────────────────────────────────────────────────────────────────
   _checkDuplicateCompra: async (op, excludeOpId = null) => {
-    if ((op.operation_type || '').toLowerCase() !== 'compra') return null;
+    if (opType(op) !== 'compra') return null;
 
     const principal = (op.vehicles || []).find(v => v && v.role === 'principal');
-    const chasis = stripSpaces(principal?.chasis).toUpperCase();
-    const chapa = stripSpaces(principal?.chapa).toUpperCase();
-    if (!chasis && !chapa) return null;
+    const key = vehKey(principal);
+    const ids = [stripSpaces(principal?.chasis), stripSpaces(principal?.chapa)]
+      .map(x => (x || '').toUpperCase().replace(/[^A-Z0-9-]/g, ''))
+      .filter(Boolean);
+    if (!key || ids.length === 0) return null;
+    const idSet = new Set(ids);
+    const norm = (x) => stripSpaces(x).toUpperCase();
+    const sameCar = (v) => v && (idSet.has(norm(v.chasis)) || idSet.has(norm(v.chapa)));
 
-    const { data, error } = await supabase
-      .from('operations')
-      .select('id, date, operation_type, vehicles(*)');
+    const filter = [...new Set(ids)].flatMap(x => [`chasis.ilike.${x}`, `chapa.ilike.${x}`]).join(',');
+    const { data: vehs, error } = await supabase.from('vehicles').select('operation_id').or(filter);
     if (error) {
       console.error('Error validando compras duplicadas:', error);
       return null; // no bloquear el guardado por un fallo de validación
     }
+    const opIds = [...new Set((vehs || []).map(v => v.operation_id))].filter(id => id && id !== excludeOpId);
+    if (opIds.length === 0) return null;
+    const { data: related, error: opErr } = await supabase
+      .from('operations').select('id, date, created_at, operation_type, vehicles(*)').in('id', opIds);
+    if (opErr) {
+      console.error('Error validando compras duplicadas:', opErr);
+      return null;
+    }
 
-    const matches = (v) => {
-      if (!v) return false;
-      const vChasis = stripSpaces(v.chasis).toUpperCase();
-      const vChapa = stripSpaces(v.chapa).toUpperCase();
-      return (chasis && vChasis === chasis) || (chapa && vChapa === chapa);
-    };
-
-    const allOps = (data || []).filter(o => o.id !== excludeOpId);
-
-    const existingCompra = allOps.find(o =>
-      (o.operation_type || '').toLowerCase() === 'compra' &&
-      (o.vehicles || []).some(v => v.role === 'principal' && matches(v))
-    );
-    if (!existingCompra) return null;
-
-    // ¿Ese vehículo ya volvió a venderse después de esa compra? Si es así,
-    // la recompra (ej. como parte de pago de otra operación) es normal.
-    const alreadySold = allOps.some(o =>
-      (o.operation_type || '').toLowerCase() === 'venta' &&
-      new Date(o.date) >= new Date(existingCompra.date) &&
-      (o.vehicles || []).some(v => v.role === 'principal' && matches(v))
-    );
-
-    return { operation: existingCompra, alreadySold };
+    const parsed = parseOpDate(op.date);
+    const refTime = parsed?.date ? parsed.date.getTime() : Date.now();
+    let entries = 0, exits = 0, lastEntry = null;
+    (related || []).filter(o => opTime(o) <= refTime).forEach(o => {
+      const t = opType(o);
+      const sale = t === 'venta' || t === 'remate';
+      (o.vehicles || []).filter(sameCar).forEach(v => {
+        const isEntry = sale ? v.role === 'parte_pago' : v.role === 'principal';
+        if (isEntry) {
+          entries++;
+          if (!lastEntry || opTime(o) > opTime(lastEntry)) lastEntry = o;
+        } else {
+          exits++;
+        }
+      });
+    });
+    if (!lastEntry) return null;
+    return { operation: lastEntry, alreadySold: entries <= exits };
   },
 
   addOperation: async (op) => {
+    assertValidOperation(op);
     const dup = await db._checkDuplicateCompra(op);
     if (dup && !dup.alreadySold) {
       const err = new Error(
-        `Ya existe una COMPRA registrada con este chasis/chapa (operación del ${dup.operation.date}) ` +
-        `y ese vehículo todavía no fue vendido. Verificá los datos antes de guardar.`
+        `Este chasis/chapa ya está en stock: entró el ${dup.operation.date} y todavía no salió. ` +
+        `Verificá que no sea una compra duplicada antes de guardar.`
       );
       err.isDuplicateError = true;
       throw err;
     }
     if (dup && dup.alreadySold) {
       const proceed = window.confirm(
-        `Este chasis/chapa ya tiene una COMPRA registrada el ${dup.operation.date}, pero ese vehículo ` +
-        `ya fue vendido después. ¿Confirmás que es una recompra (vuelve como parte de pago o similar) ` +
-        `y querés continuar?`
+        `Este chasis/chapa ya pasó por la empresa (última entrada el ${dup.operation.date}) y ya salió. ` +
+        `¿Confirmás que es una recompra y querés continuar?`
       );
       if (!proceed) {
         const err = new Error('Guardado cancelado.');
@@ -253,20 +252,20 @@ export const db = {
       // 2. Insert Vehicles
       if (op.vehicles && op.vehicles.length > 0) {
         const vehiclesToInsert = op.vehicles.map(v => ({
+          ...vehicleRow(v),
           operation_id: opData.id,
-          chapa: stripSpaces(v.chapa),
-          chasis: stripSpaces(v.chasis),
-          description: v.description,
-          color: v.color,
-          role: v.role,
-          valuation: v.valuation || 0
+          color: v.color || '',
         }));
 
         const { error: vehError } = await supabase
           .from('vehicles')
           .insert(vehiclesToInsert);
 
-        if (vehError) throw vehError;
+        if (vehError) {
+          // Sin esto quedaba una operación sin vehículos.
+          await supabase.from('operations').delete().eq('id', opData.id);
+          throw vehError;
+        }
       }
 
       return { ...opData, parentId: opData.parent_id };
@@ -274,19 +273,20 @@ export const db = {
   },
 
   updateOperation: async (id, op) => {
+    assertValidOperation(op);
     const dup = await db._checkDuplicateCompra(op, id);
     if (dup && !dup.alreadySold) {
       const err = new Error(
-        `Ya existe OTRA COMPRA registrada con este chasis/chapa (operación del ${dup.operation.date}) ` +
-        `y ese vehículo todavía no fue vendido. Verificá los datos antes de guardar.`
+        `Este chasis/chapa ya está en stock por OTRA operación (entró el ${dup.operation.date}) ` +
+        `y todavía no salió. Verificá que no sea una compra duplicada antes de guardar.`
       );
       err.isDuplicateError = true;
       throw err;
     }
     if (dup && dup.alreadySold) {
       const proceed = window.confirm(
-        `Este chasis/chapa ya tiene OTRA COMPRA registrada el ${dup.operation.date}, pero ese vehículo ` +
-        `ya fue vendido después. ¿Confirmás que es una recompra y querés continuar?`
+        `Este chasis/chapa ya pasó por la empresa en OTRA operación (última entrada el ${dup.operation.date}) ` +
+        `y ya salió. ¿Confirmás que es una recompra y querés continuar?`
       );
       if (!proceed) {
         const err = new Error('Guardado cancelado.');
@@ -297,6 +297,12 @@ export const db = {
     }
 
     return withMutation(async () => {
+      const { data: existing, error: exError } = await supabase
+        .from('vehicles')
+        .select('*')
+        .eq('operation_id', id);
+      if (exError) throw exError;
+
       // 1. Update Operation
       const { data: opData, error: opError } = await supabase
         .from('operations')
@@ -319,30 +325,36 @@ export const db = {
 
       if (opError) throw opError;
 
-      // 2. Update Vehicles (Delete old and insert new)
-      const { error: delError } = await supabase
-        .from('vehicles')
-        .delete()
-        .eq('operation_id', id);
-
-      if (delError) throw delError;
-
-      if (op.vehicles && op.vehicles.length > 0) {
-        const vehiclesToInsert = op.vehicles.map(v => ({
-          operation_id: id,
-          chapa: stripSpaces(v.chapa),
-          chasis: stripSpaces(v.chasis),
-          description: v.description,
-          color: v.color || '',
-          role: v.role,
-          valuation: v.valuation || 0
-        }));
-
-        const { error: vehError } = await supabase
-          .from('vehicles')
-          .insert(vehiclesToInsert);
-
-        if (vehError) throw vehError;
+      // 2. Vehículos sin borrar todo: antes se borraban todos y se volvían a
+      // insertar (si fallaba a mitad, la operación quedaba sin autos, y en cada
+      // edición se perdían el color, los datos de mercado y los ids). Ahora se
+      // actualiza cada fila existente, se agregan las nuevas y recién al final
+      // se borran las que el usuario sacó.
+      const prevById = new Map((existing || []).map(v => [v.id, v]));
+      const kept = new Set();
+      const toInsert = [];
+      for (const v of op.vehicles || []) {
+        const row = vehicleRow(v);
+        const prev = v.id ? prevById.get(v.id) : null;
+        if (prev && !kept.has(prev.id)) {
+          kept.add(prev.id);
+          const patch = { ...row, color: v.color ?? prev.color ?? '' };
+          // Si cambió el auto, los precios de mercado guardados ya no son de este.
+          if (vehKey(prev) !== vehKey(row)) patch.market_data = null;
+          const { error: upError } = await supabase.from('vehicles').update(patch).eq('id', prev.id);
+          if (upError) throw upError;
+        } else {
+          toInsert.push({ ...row, operation_id: id, color: v.color || '' });
+        }
+      }
+      if (toInsert.length > 0) {
+        const { error: insError } = await supabase.from('vehicles').insert(toInsert);
+        if (insError) throw insError;
+      }
+      const toDelete = (existing || []).filter(v => !kept.has(v.id)).map(v => v.id);
+      if (toDelete.length > 0) {
+        const { error: delError } = await supabase.from('vehicles').delete().in('id', toDelete);
+        if (delError) throw delError;
       }
 
       return { ...opData, parentId: opData.parent_id };
@@ -363,6 +375,14 @@ export const db = {
     // La fecha llega como dd/mm/yyyy (igual que en el resto de la app) y se
     // guarda como yyyy-mm-dd, tal cual hace updateOperation/addOperation.
     if ('date' in fields && fields.date) payload.date = fields.date.split('/').reverse().join('-');
+    if (payload.date) {
+      const pd = parseOpDate(payload.date);
+      const maxYear = new Date().getFullYear() + 1;
+      if (!pd || pd.invalid || pd.y < 2000 || pd.y > maxYear) throw new Error('La fecha no es válida.');
+    }
+    if (['delivery_amount', 'installments', 'credit_amount'].some(k => k in payload && payload[k] < 0)) {
+      throw new Error('Hay montos negativos.');
+    }
 
     return withMutation(async () => {
       const { data, error } = await supabase

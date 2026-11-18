@@ -5,9 +5,11 @@ import { Check, Loader, Zap, Search, CheckCircle2 } from 'lucide-react';
 // para las operaciones que todavía no tienen esos datos cargados (todo en 0).
 // Cada fila es un mini-formulario: escribís los 3 valores y guardás (o Enter).
 // Al guardar, la operación deja de tener valores en 0 y desaparece de la lista.
-// El tipo de pago se deriva automáticamente de las cuotas:
-// con cuotas (> 0) => crédito; sin cuotas => contado.
-const pagoFromCuotas = (installments) => ((Number(installments) || 0) > 0 ? 'crédito' : 'contado');
+// El tipo de pago se deriva del crédito: con cuotas o con monto de crédito =>
+// crédito; si no, contado. Antes sólo miraba las cuotas y una venta con monto
+// de crédito pero sin cuotas quedaba como "contado".
+const pagoFromCuotas = (installments, credit = 0) =>
+  ((Number(installments) || 0) > 0 || (Number(credit) || 0) > 0 ? 'crédito' : 'contado');
 
 // Normaliza cualquier fecha (dd/mm/yyyy legacy o yyyy-mm-dd) al formato
 // yyyy-mm-dd que necesita <input type="date">, con ceros a la izquierda.
@@ -67,7 +69,7 @@ export function QuickLoad({ operations, formatMoney, parseMoney, onSave }) {
     try {
       await onSave(op.id, {
         date: dateInput ? `${dd}/${mm}/${yy}` : undefined, // db lo guarda como yyyy-mm-dd
-        payment_type: pagoFromCuotas(installments), // auto: con cuotas => crédito, sin cuotas => contado
+        payment_type: pagoFromCuotas(installments, parseMoney(fieldVal(op, 'credit'))),
         delivery_amount: parseMoney(fieldVal(op, 'delivery')),
         installments,
         credit_amount: parseMoney(fieldVal(op, 'credit'))

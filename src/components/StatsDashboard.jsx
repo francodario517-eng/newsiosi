@@ -45,9 +45,9 @@ export function StatsDashboard({ metrics, trees, stock, onSelectTree }) {
     <div style={{ padding: '24px' }}>
       {/* KPIs principales */}
       <div className="stats-grid" style={{ marginBottom: '16px' }}>
-        <Kpi label="Ventas Totales" value={fmt(s.totalSales)} hint={`${fmtInt(s.salesCount)} ventas`} />
+        <Kpi label="Ventas Totales" value={fmt(s.totalSales)} hint={`${fmtInt(s.salesCount)} ventas${s.rescissionsCount ? ` · ${fmtInt(s.rescissionsCount)} rescisiones descontadas` : ''}`} />
         <Kpi label="Inversión en Compras" value={fmt(s.totalPurchases)} color="var(--accent-green)" hint={`${fmtInt(s.purchasesCount)} compras`} />
-        <Kpi label="Utilidad Cash Flow" value={fmt(s.netProfit)} color={s.netProfit >= 0 ? '#10b981' : '#ef4444'} hint="Ventas − Compras" />
+        <Kpi label="Utilidad Cash Flow" value={fmt(s.netProfit)} color={s.netProfit >= 0 ? '#10b981' : '#ef4444'} hint="Cobrado − pagado (sin partes de pago)" />
         <Kpi label="Utilidad Neta" value={fmt(s.netAfterCommission)} color={s.netAfterCommission >= 0 ? '#10b981' : '#ef4444'} accent={s.netAfterCommission >= 0 ? '#10b981' : '#ef4444'} hint="Descontada comisión 3%" />
       </div>
 

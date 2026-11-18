@@ -34,7 +34,9 @@ import * as XLSX from 'xlsx'
 import { StockTable } from './components/StockTable'
 import { QuickLoad } from './components/QuickLoad'
 import { apifyService } from './services/apify'
-import { opTime } from './services/lineage'
+import { opTime, opType, marketKey, resolveLineageCached, lineageRoots } from './services/lineage'
+import { formatMoney, parseMoney } from './services/money'
+import { validateOperation } from './services/validation'
 
 // Email autorizado a usar la Carga Rápida de datos financieros.
 const QUICKLOAD_EMAIL = 'francodario517@gmail.com'
@@ -65,6 +67,7 @@ function App() {
   const [editingOperation, setEditingOperation] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const savingRef = React.useRef(false)
+  const loadSeqRef = React.useRef(0)
   // Al editar, el formulario se precarga con el vehículo PRINCIPAL. Antes se
   // tomaba el primero de la lista, que puede ser un parte de pago: al guardar,
   // el parte de pago quedaba también como auto vendido y el real se perdía.
@@ -85,9 +88,10 @@ function App() {
 
     operations.forEach(op => {
       const type = (op.operation_type || '').toLowerCase();
-      const isVenta = type === 'venta';
-      const isCompra = type === 'compra';
-      // Any non-venta operation (compra, rescisión, remate, importación, recuperado de secuestro, etc.)
+      // Remate es una venta (el auto sale), no una entrada.
+      const isVenta = type === 'venta' || type === 'remate';
+      const isCompra = !isVenta;
+      // Cualquier otra operación (compra, rescisión, importación, recuperado de secuestro, etc.) es entrada.
       const isEntry = !isVenta;
 
       // Record Exits
@@ -196,7 +200,7 @@ function App() {
       const batch = vehiclesToProcess.slice(i, i + batchSize);
       
       await Promise.all(batch.map(async (v) => {
-        const vId = (v.chapa || v.chasis || v.description || '').trim().toUpperCase();
+        const vId = marketKey(v);
         
         // AHORRO DE CRÉDITOS: Verificar si ya tiene datos frescos (< 24h)
         const existing = stockMarketData[vId];
@@ -288,7 +292,7 @@ function App() {
     operations.forEach(op => {
       op.vehicles?.forEach(v => {
         if (v.market_data) {
-          const vId = (v.chasis || v.chapa || v.description || '').trim().toUpperCase();
+          const vId = marketKey(v);
           if (vId && (!newMarketData[vId] || (v.market_data.updatedAtISO > (newMarketData[vId].updatedAtISO || '')))) {
             newMarketData[vId] = v.market_data;
           }
@@ -311,17 +315,7 @@ function App() {
 
 
   
-  // Money formatting helpers
-  const formatMoney = (val) => {
-    if (val === null || val === undefined || val === '') return '';
-    const stringVal = val.toString().replace(/\D/g, '');
-    return stringVal.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  };
-
-  const parseMoney = (val) => {
-    if (!val) return 0;
-    return Number(val.toString().replace(/\./g, '')) || 0;
-  };
+  // Montos: formatMoney / parseMoney de services/money.js (admiten decimales con coma).
 
   // Solo este usuario ve la Carga Rápida de datos financieros.
   const canQuickLoad = (session?.user?.email || '').toLowerCase() === QUICKLOAD_EMAIL;
@@ -329,6 +323,20 @@ function App() {
   // Guardado liviano de campos sueltos (para la Carga Rápida): fecha, tipo,
   // entrega, cuotas y crédito. La lista se refresca sola vía Realtime.
   const handleQuickSave = async (id, values) => {
+    // Misma validación que el formulario, sobre la operación como quedaría.
+    const current = operations.find(o => o.id === id);
+    if (current) {
+      const merged = { ...current, ...values, date: values.date || current.date };
+      // Sólo lo que toca la Carga Rápida (fecha y montos): un problema de otro
+      // campo (ej. chasis) no impide completar el desglose.
+      const relevant = validateOperation(merged).issues.filter(i => i.cat === 'fecha' || i.cat === 'montos');
+      const errors = relevant.filter(i => i.level === 'error').map(i => i.msg);
+      const warnings = relevant.filter(i => i.level === 'warning').map(i => i.msg);
+      if (errors.length) throw new Error('No se puede guardar:\n• ' + errors.join('\n• '));
+      if (warnings.length && !window.confirm('Atención:\n• ' + warnings.join('\n• ') + '\n\n¿Guardar igual?')) {
+        throw new Error('Guardado cancelado.');
+      }
+    }
     await db.updateOperationQuick(id, values);
   };
 
@@ -382,9 +390,12 @@ function App() {
 
   useEffect(() => {
     const loadAll = async () => {
+      // Si llegan dos recargas seguidas, la respuesta vieja no pisa a la nueva.
+      const seq = ++loadSeqRef.current;
       try {
         // Load operations
         const data = await db.getOperations();
+        if (seq !== loadSeqRef.current) return;
         setOperations(data);
         
         // Reload profile if we have a session (to handle permission changes)
@@ -605,7 +616,6 @@ function App() {
   const saveOperation = async (e) => {
     const formData = new FormData(e.target);
     
-    const dateVal = formData.get('date');
     const opData = {
       user_id: session.user.id,
       operation_type: formData.get('type').toLowerCase(),
@@ -615,7 +625,7 @@ function App() {
         if (!dVal) return new Date().toLocaleDateString('es-PY');
         const [y, m, d] = dVal.split('-');
         return `${d}/${m}/${y}`;
-      })(), 
+      })(),
       currency: formData.get('currency') || 'USD',
       total_amount: parseMoney(formData.get('amount')),
       buyer: formData.get('buyer'),
@@ -626,18 +636,30 @@ function App() {
       parentId: preFilledData?.operation_id || editingOperation?.parentId || null,
       vehicles: [
         {
+          // Al editar se conserva la fila del vehículo (id, color, datos de mercado).
+          ...(editingOperation && editingPrincipal ? { id: editingPrincipal.id, color: editingPrincipal.color } : {}),
           chapa: formData.get('chapa'),
           chasis: formData.get('chasis'),
           description: formData.get('description'),
           role: 'principal'
         },
         ...tradeInVehicles.map(v => ({
-          ...v,
+          ...(editingOperation ? v : { ...v, id: undefined }),
           role: 'parte_pago',
           valuation: parseMoney(v.valuation)
         }))
       ]
     };
+
+    // Validación: los errores no dejan guardar; las advertencias piden confirmación.
+    const { errors, warnings } = validateOperation(opData);
+    if (errors.length) {
+      alert('No se puede guardar:\n\n• ' + errors.join('\n• '));
+      return;
+    }
+    if (warnings.length && !window.confirm('Atención:\n\n• ' + warnings.join('\n• ') + '\n\n¿Guardar igual?')) {
+      return;
+    }
 
     try {
       let savedOp = null;
@@ -662,7 +684,15 @@ function App() {
   }
 
   const handleDeleteOperation = async (op) => {
-    if (window.confirm(`¿Estás seguro de eliminar esta operación del ${op.date}? Se borrarán también los vehículos asociados.`)) {
+    // Las operaciones vinculadas a mano a esta quedan sueltas al borrarla (la
+    // base les pone el vínculo en vacío): avisar antes.
+    const linked = operations.filter(o => o.parentId === op.id);
+    const linkedMsg = linked.length
+      ? `\n\nOJO: ${linked.length} operación(es) están vinculadas a esta y van a quedar sin ese vínculo:\n` +
+        linked.slice(0, 5).map(o => `• ${o.date} ${o.operation_type} ${o.buyer || ''}`).join('\n') +
+        (linked.length > 5 ? `\n• y ${linked.length - 5} más` : '')
+      : '';
+    if (window.confirm(`¿Estás seguro de eliminar esta operación del ${op.date}? Se borrarán también los vehículos asociados.${linkedMsg}`)) {
       try {
         await db.deleteOperation(op.id);
         // Local refresh is handled via subscription in useEffect
@@ -710,34 +740,9 @@ function App() {
         cell.border = { bottom: { style: 'medium', color: { argb: 'FFaa3bff' } } };
       });
 
-      // Compute stockSet self-contained from all operations (mirrors stockVehicles logic)
-      // Any non-venta operation (compra, rescisión, importación, remate, recuperado de secuestro, etc.)
-      // whose principal vehicle has more entries than exits is considered "in stock".
-      const _entryMap = new Map();
-      const _exitCounts = new Map();
-      operations.forEach(op => {
-        const t = (op.operation_type || '').toLowerCase();
-        const isV = t === 'venta';
-        const isCom = t === 'compra';
-        op.vehicles?.forEach(v => {
-          if (!v) return;
-          const id = (v.chasis || v.chapa || '').trim().toUpperCase();
-          if (!id) return;
-          // Exits: venta principal, or compra parte_pago
-          if ((isV && v.role === 'principal') || (isCom && v.role === 'parte_pago')) {
-            _exitCounts.set(id, (_exitCounts.get(id) || 0) + 1);
-          }
-          // Entries: any non-venta principal, or venta parte_pago
-          if ((!isV && v.role === 'principal') || (isV && v.role === 'parte_pago')) {
-            if (!_entryMap.has(id)) _entryMap.set(id, 0);
-            _entryMap.set(id, _entryMap.get(id) + 1);
-          }
-        });
-      });
-      const stockSet = new Set();
-      _entryMap.forEach((entries, id) => {
-        if (entries > (_exitCounts.get(id) || 0)) stockSet.add(id);
-      });
+      // Stock: el mismo cálculo que la pantalla de Inventario.
+      const stockKey = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
+      const stockSet = new Set(stockVehicles.map(stockKey).filter(Boolean));
 
       const fillRow = (row, argb) => {
         row.eachCell({ includeEmpty: true }, cell => {
@@ -746,112 +751,67 @@ function App() {
         });
       };
 
-      const processedIds = new Set();
-      const getVehId = (v) => (v && (v.chasis || v.chapa || '').trim().toUpperCase()) || '';
-      const parseDate = (d) => {
-        if (!d) return new Date(0);
-        const parts = d.toString().split(/[-/]/).map(Number);
-        if (parts.length === 3) {
-          if (parts[0] > 1000) return new Date(parts[0], parts[1] - 1, parts[2]);
-          return new Date(parts[2], parts[1] - 1, parts[0]);
-        }
-        const parsed = new Date(d);
-        return isNaN(parsed.getTime()) ? new Date(0) : parsed;
-      };
+      // Cadenas con el mismo linaje que el árbol en pantalla (services/lineage.js)
+      // y la misma ganancia (financials.chainStats). Antes el Excel armaba las
+      // cadenas con una lógica propia, perdía filas que no colgaban de una raíz y
+      // su "Ganancia Est." era ventas − compras, sin partes de pago ni comisión.
+      const lineage = resolveLineageCached(operations);
+      const rootOf = lineageRoots(operations, lineage);
+      const childrenOf = new Map();
+      operations.forEach(o => {
+        const link = lineage.get(o.id);
+        if (!link) return;
+        if (!childrenOf.has(link.parentId)) childrenOf.set(link.parentId, []);
+        childrenOf.get(link.parentId).push(o);
+      });
+      const chainOpsOf = new Map();
+      operations.forEach(o => {
+        const r = rootOf.get(o.id);
+        if (!chainOpsOf.has(r)) chainOpsOf.set(r, []);
+        chainOpsOf.get(r).push(o);
+      });
+      const byDate = (a, b) => (opTime(a) - opTime(b)) || String(a.created_at || '').localeCompare(String(b.created_at || ''));
 
-      filteredOperations.forEach(op => {
-        if (processedIds.has(op.id)) return;
+      // Una cadena por cada operación del filtro, en el orden de la lista.
+      const chainRoots = [];
+      const seenRoots = new Set();
+      filteredOperations.forEach(o => {
+        const r = rootOf.get(o.id);
+        if (r && !seenRoots.has(r)) { seenRoots.add(r); chainRoots.push(r); }
+      });
 
-        const chainOps = new Set();
-        const toCheck = [op.id];
-        while (toCheck.length > 0) {
-          const currentId = toCheck.pop();
-          if (chainOps.has(currentId)) continue;
-          const currentOp = operations.find(o => o.id === currentId);
-          if (!currentOp) continue;
-          chainOps.add(currentId);
-          if (currentOp.parentId && !chainOps.has(currentOp.parentId)) toCheck.push(currentOp.parentId);
-          operations.filter(o => o.parentId === currentId && !chainOps.has(o.id)).forEach(o => toCheck.push(o.id));
-          const principal = (currentOp.vehicles || []).find(v => v.role === 'principal');
-          const pId = getVehId(principal);
-          if (pId) {
-            operations.filter(o => !chainOps.has(o.id) && (o.vehicles || []).some(v => getVehId(v) === pId)).forEach(o => toCheck.push(o.id));
-          }
-          (currentOp.vehicles || []).filter(v => v.role === 'parte_pago').forEach(t => {
-            const tId = getVehId(t);
-            if (tId) {
-              operations.filter(o => !chainOps.has(o.id) && (o.vehicles || []).some(v => getVehId(v) === tId)).forEach(o => toCheck.push(o.id));
-            }
-          });
-        }
+      chainRoots.forEach(rootId => {
+        const chainOps = chainOpsOf.get(rootId) || [];
+        const stats = financials.chainStats(chainOps);
+        const chainId = rootId.substring(0, 13);
+        const printed = new Set();
 
-        const fullChain = Array.from(chainOps).map(id => operations.find(o => o.id === id)).filter(Boolean);
+        const pushToSheet = (node, depth) => {
+          if (printed.has(node.id)) return;
+          printed.add(node.id);
 
-        const roots = fullChain.filter(o => {
-          if (o.parentId && fullChain.some(p => p.id === o.parentId)) return false;
-          const princ = (o.vehicles || []).find(v => v.role === 'principal');
-          const pId = getVehId(princ);
-          const isTradeInOfOther = fullChain.some(other =>
-            other.id !== o.id && (other.vehicles || []).some(v => v.role === 'parte_pago' && getVehId(v) === pId)
-          );
-          if (isTradeInOfOther) return false;
-          if (o.operation_type.toLowerCase() === 'venta' && pId) {
-            const hasCompraInChain = fullChain.some(other =>
-              other.operation_type.toLowerCase() === 'compra' &&
-              (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId)
-            );
-            if (hasCompraInChain) return false;
-          }
-          if (o.operation_type.toLowerCase() === 'compra' && pId) {
-            const earlierCompra = fullChain.some(other =>
-              other.id !== o.id &&
-              other.operation_type.toLowerCase() === 'compra' &&
-              (other.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId) &&
-              parseDate(other.date) < parseDate(o.date)
-            );
-            if (earlierCompra) return false;
-          }
-          return true;
-        });
-        roots.sort((a, b) => parseDate(a.date) - parseDate(b.date));
-
-        const chainId = roots[0]?.id.substring(0, 13) || op.id.substring(0, 13);
-        const investCost = roots[0]?.total_amount || 0;
-
-        let chainRevenue = 0;
-        let chainInvestment = 0;
-        fullChain.forEach(node => {
-          const amt = Number(node.total_amount) || 0;
-          if (node.operation_type.toLowerCase() === 'venta') chainRevenue += amt;
-          else if (node.operation_type.toLowerCase() === 'compra') chainInvestment += amt;
-        });
-        const chainProfit = chainRevenue - chainInvestment;
-
-        const pushToSheet = (node, depth = 0) => {
-          if (processedIds.has(node.id)) return;
-          processedIds.add(node.id);
-
-          const nodeType = node.operation_type.toLowerCase();
+          const nodeType = opType(node);
+          const isSale = nodeType === 'venta' || nodeType === 'remate';
           const principal = node.vehicles?.find(v => v.role === 'principal');
-          const pId = getVehId(principal);
+          const pId = stockKey(principal);
           const tradeIns = node.vehicles?.filter(v => v.role === 'parte_pago') || [];
           const indent = depth > 0 ? '   '.repeat(depth) + '↳ ' : '';
-          const md = stockMarketData[pId] || null;
+          const md = principal ? (stockMarketData[marketKey(principal)] || null) : null;
           const mainInStock = pId ? stockSet.has(pId) : false;
 
           const mainRow = sheet.addRow({
             chain_id: chainId,
             date: node.date,
-            operation: nodeType.toUpperCase(),
+            operation: (node.operation_type || '').toUpperCase(),
             buyer: node.buyer || '',
             vehicle: indent + (principal?.description || 'N/A'),
             chapa: principal?.chapa || 'N/A',
             chasis: principal?.chasis || 'N/A',
-            amount: node.total_amount || 0,
+            amount: Number(node.total_amount) || 0,
             amount_type: 'TOTAL OPERACIÓN',
-            stock_status: pId ? (mainInStock ? '✔ EN STOCK' : '✘ VENDIDO') : '',
-            invest_cost: investCost,
-            profit_est: chainProfit,
+            stock_status: pId ? (mainInStock ? '✔ EN STOCK' : '✘ SALIÓ') : '',
+            invest_cost: stats.totalInvestment,
+            profit_est: stats.totalProfit,
             clasipar:    md ? (md.clasipar    || '') : '',
             marketplace: md ? (md.marketplace || '') : '',
             instagram:   md ? (md.instagram   || '') : '',
@@ -861,11 +821,14 @@ function App() {
             real_data:   md ? (md.isRealData ? 'REAL' : 'ESTIMADO') : 'PENDIENTE',
           });
           mainRow.height = 20;
+          if (stats.missingCostCount > 0) {
+            mainRow.getCell('profit_est').note = `Falta el costo de ${stats.missingCostCount} operación(es) de esta cadena (compra en cero o venta sin su compra): la ganancia sale inflada.`;
+          }
 
-          if (nodeType === 'compra') {
+          if (!isSale && nodeType !== 'rescision') {
             fillRow(mainRow, 'FFdff2eb');
             mainRow.getCell('operation').font = { bold: true, color: { argb: 'FF1a6b45' }, size: 10 };
-          } else if (nodeType === 'venta') {
+          } else if (isSale) {
             fillRow(mainRow, 'FFfde8e8');
             mainRow.getCell('operation').font = { bold: true, color: { argb: 'FF9b2020' }, size: 10 };
           } else {
@@ -880,9 +843,10 @@ function App() {
             };
           }
 
-          // Una fila por cada vehículo entregado como parte de pago
+          // Una fila por cada parte de pago: en una venta es un auto que ENTRA,
+          // en una compra es un auto nuestro que SALE.
           tradeIns.forEach(t => {
-            const tId = (t.chasis || t.chapa || '').trim().toUpperCase();
+            const tId = stockKey(t);
             const inStock = tId ? stockSet.has(tId) : false;
             const statusColor = inStock ? 'FF1a6b45' : 'FF9b2020';
             const bgColor = inStock ? 'FFedf7f2' : 'FFfceeee';
@@ -895,9 +859,9 @@ function App() {
               vehicle:      '   └─ ' + (t.description || 'N/A'),
               chapa:        t.chapa  || 'N/A',
               chasis:       t.chasis || 'N/A',
-              amount:       t.valuation || 0,
-              amount_type:  'VALOR ENTREGADO',
-              stock_status: inStock ? '✔ EN STOCK' : '✘ VENDIDO',
+              amount:       Number(t.valuation) || 0,
+              amount_type:  isSale ? 'VALOR RECIBIDO' : 'VALOR ENTREGADO',
+              stock_status: tId ? (inStock ? '✔ EN STOCK' : '✘ SALIÓ') : '',
               invest_cost:  '',
               profit_est:   '',
               clasipar: '', marketplace: '', instagram: '',
@@ -911,24 +875,14 @@ function App() {
             trRow.getCell('stock_status').font = { bold: true, color: { argb: statusColor }, size: 10 };
           });
 
-          const children = fullChain.filter(o => {
-            if (processedIds.has(o.id)) return false;
-            if (o.parentId === node.id) return true;
-            if (nodeType === 'compra' && pId) {
-              if (o.operation_type.toLowerCase() === 'venta' &&
-                  (o.vehicles || []).some(v => v.role === 'principal' && getVehId(v) === pId)) return true;
-            }
-            if (nodeType === 'venta') {
-              if (o.operation_type.toLowerCase() === 'compra' &&
-                  (o.vehicles || []).some(v => v.role === 'principal' && tradeIns.some(t => getVehId(t) === getVehId(v)))) return true;
-            }
-            return false;
-          });
-          children.sort((a, b) => parseDate(a.date) - parseDate(b.date));
-          children.forEach(c => pushToSheet(c, depth + 1));
+          [...(childrenOf.get(node.id) || [])].sort(byDate).forEach(c => pushToSheet(c, depth + 1));
         };
 
-        roots.forEach(r => pushToSheet(r, 0));
+        const root = chainOps.find(o => o.id === rootId);
+        if (root) pushToSheet(root, 0);
+        // Red de seguridad: ninguna operación de la cadena queda afuera.
+        [...chainOps].sort(byDate).forEach(o => pushToSheet(o, 1));
+
         const sepRow = sheet.addRow({});
         fillRow(sepRow, 'FF050507');
         sepRow.height = 6;
@@ -980,7 +934,7 @@ function App() {
       };
 
       const exportData = await Promise.all(filteredStockVehicles.map(async (item) => {
-        const vId = item.chasis || item.chapa || item.description;
+        const vId = marketKey(item);
         const md = stockMarketData[vId];
         const estimatedProfit = await getEstimatedProfit(item);
         return {
@@ -1041,12 +995,14 @@ function App() {
       switch (period) {
         case 'today': return date.toDateString() === now.toDateString();
         case 'week': {
-          const start = new Date(now); start.setDate(now.getDate() - now.getDay());
+          // Desde el domingo a las 00:00 (antes arrancaba a la hora actual).
+          const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
           return date >= start && date <= now;
         }
         case 'month': return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         case 'lastMonth': {
-          const last = new Date(now); last.setMonth(now.getMonth() - 1);
+          // Día 1 del mes anterior (setMonth fallaba los días 29 a 31: 31/03 → "03/03").
+          const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
           return date.getMonth() === last.getMonth() && date.getFullYear() === last.getFullYear();
         }
         case 'year': return date.getFullYear() === now.getFullYear();
@@ -1063,7 +1019,10 @@ function App() {
         }
         case 'custom': {
           if (!customRange.start || !customRange.end) return true;
-          const s = new Date(customRange.start); const e = new Date(customRange.end);
+          // Fechas locales y el día final completo (new Date("aaaa-mm-dd") es UTC
+          // y dejaba afuera el último día).
+          const s = parseLocal(customRange.start);
+          const e = parseLocal(customRange.end); e.setHours(23, 59, 59, 999);
           return date >= s && date <= e;
         }
         default: return true;
@@ -1313,7 +1272,7 @@ function App() {
                 <Package color="#3b82f6" size={18} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ color: 'var(--text-muted)', fontSize: '11px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Inversión Inicial</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '11px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Inversión</div>
                 {isTreeLoading ? (
                   <div className="skeleton" style={{ height: '20px', width: '80%', marginTop: '4px' }}></div>
                 ) : (
@@ -1331,7 +1290,12 @@ function App() {
                 {isTreeLoading ? (
                   <div className="skeleton" style={{ height: '20px', width: '80%', marginTop: '4px' }}></div>
                 ) : (
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: (stats.totalProfit ?? 0) > 0 ? '#10b981' : '#ef4444' }}>USD {(stats.totalProfit ?? 0).toLocaleString()}</div>
+                  <>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: (stats.totalProfit ?? 0) > 0 ? '#10b981' : '#ef4444' }}>USD {Math.round(stats.totalProfit ?? 0).toLocaleString()}</div>
+                    {stats.missingCostCount > 0 && (
+                      <div style={{ fontSize: '10px', color: '#fbbf24' }} title="Hay compras con total en cero o ventas sin su compra cargada: la ganancia de esta cadena sale inflada.">⚠ falta el costo de {stats.missingCostCount} operación(es)</div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1508,7 +1472,7 @@ function App() {
                     required
                     defaultValue={
                       editingOperation ? (editingOperation.date.includes('/') ? editingOperation.date.split('/').reverse().join('-') : editingOperation.date) :
-                      (preFilledData?.date || new Date().toISOString().split('T')[0])
+                      (preFilledData?.date || new Date().toLocaleDateString('en-CA')) /* hoy en hora local (aaaa-mm-dd); toISOString daba el día siguiente desde las 21:00 */
                     }
                   />
                 </div>
