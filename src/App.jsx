@@ -34,6 +34,7 @@ import * as XLSX from 'xlsx'
 import { StockTable } from './components/StockTable'
 import { QuickLoad } from './components/QuickLoad'
 import { apifyService } from './services/apify'
+import { opTime } from './services/lineage'
 
 // Email autorizado a usar la Carga Rápida de datos financieros.
 const QUICKLOAD_EMAIL = 'francodario517@gmail.com'
@@ -62,6 +63,12 @@ function App() {
   const [session, setSession] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [editingOperation, setEditingOperation] = useState(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const savingRef = React.useRef(false)
+  // Al editar, el formulario se precarga con el vehículo PRINCIPAL. Antes se
+  // tomaba el primero de la lista, que puede ser un parte de pago: al guardar,
+  // el parte de pago quedaba también como auto vendido y el real se perdía.
+  const editingPrincipal = (editingOperation?.vehicles || []).find(v => v && v.role === 'principal') || null
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [realtimeStatus, setRealtimeStatus] = useState('CONNECTING') // 'CONNECTED' | 'ERROR' | 'DISCONNECTED' | 'CONNECTING'
   // IMPORTANTE: stockMarketData NO se inicializa desde localStorage.
@@ -115,7 +122,9 @@ function App() {
               valuation: v.role === 'principal' ? (op.total_amount || 0) : (v.valuation || 0),
               entry_date: op.date,
               source_type: isPrincipalEntry ? type.toUpperCase() : 'PARTE PAGO RECIBIDO',
-              operation_id: op.id
+              operation_id: op.id,
+              _t: opTime(op),
+              _created: op.created_at || ''
             });
           }
         }
@@ -125,14 +134,18 @@ function App() {
     const activeStock = [];
     entryMap.forEach((entries, id) => {
       const exits = exitCounts.get(id) || 0;
-      // If we have more entries than exits, the REMAINING ones are in stock
-      // Typically the most recent ones.
+      // Si hay más entradas que salidas, las que quedan en stock son las MÁS
+      // RECIENTES. Se ordena por fecha explícitamente: las operaciones llegan
+      // de la más nueva a la más vieja, y tomar el final de la lista mostraba
+      // la entrada más vieja (costo, fecha y origen de una compra anterior).
       if (entries.length > exits) {
-        // We take the difference
         const countInStock = entries.length - exits;
-        // Add the last 'n' entries back to stock
-        const remaining = entries.slice(-countInStock);
-        activeStock.push(...remaining);
+        const newestFirst = [...entries].sort((a, b) =>
+          (b._t - a._t) || String(b._created).localeCompare(String(a._created)));
+        newestFirst.slice(0, countInStock).forEach((entry) => {
+          const { _t, _created, ...rest } = entry;
+          activeStock.push(rest);
+        });
       }
     });
 
@@ -575,6 +588,21 @@ function App() {
 
   const handleSaveOperation = async (e) => {
     e.preventDefault();
+    // Un doble clic en "Guardar" cargaba la misma operación dos veces (hay
+    // pares idénticos creados en el mismo segundo). El ref corta el segundo
+    // envío aunque el estado todavía no se haya actualizado.
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      await saveOperation(e);
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
+  }
+
+  const saveOperation = async (e) => {
     const formData = new FormData(e.target);
     
     const dateVal = formData.get('date');
@@ -1485,13 +1513,13 @@ function App() {
                   />
                 </div>
                 <div className="form-grid-2-nested">
-                  <div><label>Chapa</label><input name="chapa" defaultValue={editingOperation?.vehicles?.[0]?.chapa || preFilledData?.chapa || ''} /></div>
-                  <div><label>Chasis</label><input name="chasis" defaultValue={editingOperation?.vehicles?.[0]?.chasis || preFilledData?.chasis || ''} /></div>
+                  <div><label>Chapa</label><input name="chapa" defaultValue={(editingOperation ? editingPrincipal?.chapa : preFilledData?.chapa) || ''} /></div>
+                  <div><label>Chasis</label><input name="chasis" defaultValue={(editingOperation ? editingPrincipal?.chasis : preFilledData?.chasis) || ''} /></div>
                 </div>
               </div>
 
               <label>Descripción del Vehículo</label>
-              <input name="description" defaultValue={editingOperation?.vehicles?.[0]?.description || preFilledData?.description || ''} />
+              <input name="description" defaultValue={(editingOperation ? editingPrincipal?.description : preFilledData?.description) || ''} />
               
               <label>Comprador / Vendedor</label>
               <input name="buyer" defaultValue={editingOperation?.buyer || preFilledData?.buyer || ''} placeholder="Nombre completo" />
@@ -1552,8 +1580,8 @@ function App() {
               </div>
 
               <div style={{ marginTop: '32px' }}>
-                <button type="submit" className="btn btn-primary" style={{ width: '100%', height: '50px' }}>
-                  {editingOperation ? 'Guardar Cambios' : 'Finalizar y Vincular'}
+                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ width: '100%', height: '50px', opacity: isSaving ? 0.6 : 1 }}>
+                  {isSaving ? 'Guardando…' : (editingOperation ? 'Guardar Cambios' : 'Finalizar y Vincular')}
                 </button>
               </div>
             </form>
