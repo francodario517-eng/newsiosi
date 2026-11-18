@@ -1,7 +1,10 @@
-const _k1 = 'apify_api_2aJGaiGoU';
-const _k2 = '6eHmlMhFKldYPNmZevbpt2xJfJh';
-const APIFY_TOKEN = _k1 + _k2;
-const GOOGLE_ACTOR = 'apify~google-search-scraper';
+import { supabase } from './db';
+
+// El token de Apify ya NO vive en el navegador: estaba en el código de un
+// repositorio público. La búsqueda la hace la función de servidor
+// /api/precios-mercado con el token guardado en la variable de entorno
+// APIFY_TOKEN de Vercel, y sólo atiende a usuarios con sesión iniciada.
+const MARKET_ENDPOINT = '/api/precios-mercado';
 
 function extractPriceUSD(text, usdRate) {
   if (!text) return null;
@@ -61,21 +64,24 @@ async function fetchGooglePrices(desc, usdRate) {
 
 async function runApify(query) {
   try {
-    const url = `https://api.apify.com/v2/acts/${GOOGLE_ACTOR}/run-sync-get-dataset-items?token=${APIFY_TOKEN}`;
-    const res = await fetch(url, {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return [];
+    const res = await fetch(MARKET_ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        queries: query,
-        maxPagesPerQuery: 1,
-        resultsPerPage: 10,
-        countryCode: 'py',
-        languageCode: 'es',
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ query }),
     });
+    if (!res.ok) {
+      console.warn('Precios de mercado no disponibles:', res.status, await res.text());
+      return [];
+    }
     const data = await res.json();
-    return data?.[0]?.organicResults ?? [];
+    return Array.isArray(data) ? data : [];
   } catch (err) {
+    console.warn('Precios de mercado no disponibles:', err);
     return [];
   }
 }
