@@ -20,6 +20,11 @@ const TOLERANCE_MS = PARENT_DATE_TOLERANCE_DAYS * 24 * 60 * 60 * 1000;
 // Un vehículo es su chasis (o su chapa si no tiene chasis), sin espacios.
 export const vehKey = (v) => ((v && (v.chasis || v.chapa)) || '').replace(/\s+/g, '').toUpperCase();
 
+// Clave de los datos de mercado de un vehículo (memoria y pantallas). Antes cada
+// pantalla usaba una distinta (chapa primero / chasis primero) y los precios
+// guardados no aparecían al recargar.
+export const marketKey = (v) => vehKey(v) || String(v?.description || '').trim().toUpperCase();
+
 export const opType = (op) =>
   (op?.operation_type || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 

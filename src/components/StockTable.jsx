@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShoppingCart, Calendar, TrendingUp, TrendingDown, DollarSign, Globe, Loader, GitBranch } from 'lucide-react';
 import { db, supabase } from '../services/db';
+import { marketKey } from '../services/lineage';
 
 export function StockTable({
   stock,
@@ -62,7 +63,7 @@ export function StockTable({
               </tr>
             ) : (
               stock.map((item, idx) => {
-                const vId = (item.chapa || item.chasis || item.description || '').trim().toUpperCase();
+                const vId = marketKey(item);
                 const md = marketData[vId];
                 
                 return (
