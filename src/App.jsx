@@ -478,7 +478,10 @@ function App() {
     return () => { cancelled = true; };
   }, [operations, activeTab, highlightedId]);
 
-  const handleSelectOperation = async (op) => {
+  // opsList: la lista con la que se arma el árbol. Después de guardar se pasa la
+  // recién leída: el estado `operations` todavía no tiene la operación nueva.
+  const handleSelectOperation = async (op, opsList) => {
+    const list = Array.isArray(opsList) ? opsList : operations;
     const vehicleId = getTreeSeedId(op);
 
     setHighlightedId(op.id);
@@ -497,7 +500,7 @@ function App() {
 
     setIsTreeLoading(true);
     try {
-      const trace = await db.getVehicleTraceability(vehicleId, operations, op.id);
+      const trace = await db.getVehicleTraceability(vehicleId, list, op.id);
       setSelectedTraceability(trace);
       setStats(financials.getTreeStats(trace));
     } catch (err) {
@@ -678,8 +681,21 @@ function App() {
       setPreFilledData(null);
       setTradeInVehicles([]);
       
-      // Always navigate to the tree view for the saved operation
-      handleSelectOperation({ ...opData, id: savedOp?.id || editingOperation?.id });
+      // Mostrar el árbol de la operación recién guardada. Antes se armaba con la
+      // lista vieja (sin la operación nueva) y el árbol caía en otra operación
+      // con el mismo chasis: se veía la cadena vieja y la rama siguiente ("+")
+      // se colgaba de ella. Se relee la lista y el árbol se arma con esa.
+      const savedId = savedOp?.id || editingOperation?.id;
+      let fresh = null;
+      try {
+        fresh = await db.getOperations();
+        loadSeqRef.current++; // una recarga anterior todavía en curso no pisa esta lista
+        setOperations(fresh);
+      } catch (loadErr) {
+        console.error('No se pudo releer la lista después de guardar:', loadErr);
+      }
+      const savedFull = fresh?.find(o => o.id === savedId) || { ...opData, id: savedId };
+      handleSelectOperation(savedFull, fresh || undefined);
     } catch (err) {
       console.error("Error al guardar operación:", err);
       if (err.cancelled) return; // el usuario ya canceló desde el confirm, no repetir el aviso
