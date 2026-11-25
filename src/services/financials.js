@@ -6,17 +6,28 @@ import { lineageRoots, vehKey, opType, opTime } from './lineage.js';
  * Una sola fórmula para la ganancia de una cadena (árbol), que usan la pantalla
  * del árbol, "Rendimiento por árbol" y los dos Excel:
  *
- *   ganancia = cobrado − pagado + valor (al costo) de los autos que siguen en mano − comisión
+ *   ganancia = cobrado − pagado + plata puesta en los autos que siguen en mano − comisión
  *
  *   cobrado = ventas/remates: total − partes de pago RECIBIDAS (lo que no es auto)
  *   pagado  = compras/rescisiones: total − autos nuestros ENTREGADOS como parte de pago
  *   en mano = cada auto que entró en la cadena (compra, rescisión o parte de pago
- *             recibida) y no salió (venta o entregado en una compra), a su costo
+ *             recibida) y no salió (venta o entregado en una compra), por la PLATA
+ *             que se puso en él:
+ *               - usado recibido como parte de pago: 0 (no salió plata por él)
+ *               - compra: lo pagado en efectivo + la plata puesta en los autos
+ *                 que se entregaron como parte de pago en esa compra
  *   comisión = 3% de cada venta
  *
- * Antes la inversión era sólo la compra más vieja y la compra siguiente contaba
- * entera como valor en mano: comprar A en 10.000 y después B en 25.000
- * entregando A mostraba +15.000 de ganancia. Ahora da 0, que es lo real.
+ * Un usado recibido NO suma ganancia mientras no se venda: la ganancia es lo que
+ * está en el bolsillo. Cuando el usado se vende, lo cobrado entra en "cobrado".
+ * Antes se sumaba por su valuación (vender en 125.000 con un usado de 80.000
+ * daba 80.000 de "ganancia" sin haber cobrado nada por él).
+ *
+ * Comprar A en 10.000 y después B en 25.000 entregando A sigue dando 0: B está
+ * en mano por los 25.000 de plata que costó (15.000 + los 10.000 de A).
+ *
+ * El valor de los autos en mano a su valuación sigue en currentHoldingValue
+ * (sólo informativo, no entra en la ganancia).
  */
 
 const COMMISSION_RATE = 0.03;
@@ -34,7 +45,7 @@ export const chainStats = (ops) => {
   const list = (ops || []).filter(Boolean);
   let totalRevenue = 0, totalInvestment = 0, totalCommission = 0;
   let tradeInCount = 0, salesCount = 0, purchasesCount = 0, purchasesWithoutCost = 0;
-  const entries = new Map();   // auto -> [{ cost, kind, t, created }]
+  const entries = new Map();   // auto -> [{ cost, cash, kind, t, created }]
   const exits = new Map();     // auto -> cantidad de salidas
   const noKey = [];            // entradas sin chasis/chapa: no se pueden seguir, quedan en mano
 
@@ -45,7 +56,20 @@ export const chainStats = (ops) => {
   };
   const addExit = (key) => { if (key) exits.set(key, (exits.get(key) || 0) + 1); };
 
-  list.forEach(op => {
+  // Plata puesta en un auto que se entrega como parte de pago: la de su entrada
+  // más reciente en la cadena. Si no entró en la cadena no sabemos su costo y se
+  // toma su valuación (esos casos ya cuentan en missingCostCount).
+  const cashInVehicle = (v) => {
+    const prev = entries.get(vehKey(v));
+    return prev && prev.length ? prev[prev.length - 1].cash : num(v.valuation);
+  };
+
+  // En orden de fecha, para que una compra encuentre la entrada anterior del auto
+  // que se entrega como parte de pago.
+  const chronological = [...list].sort((a, b) =>
+    (opTime(a) - opTime(b)) || String(a.created_at || '').localeCompare(String(b.created_at || '')));
+
+  chronological.forEach(op => {
     const t = opType(op);
     const total = effectiveTotal(op);
     const trade = tradeInsOf(op);
@@ -59,13 +83,14 @@ export const chainStats = (ops) => {
       totalCommission += total * COMMISSION_RATE;
       tradeInCount += trade.length;
       addExit(vehKey(principal));
-      trade.forEach(v => addEntry(vehKey(v), { cost: num(v.valuation), kind: 'parte_pago', ...when }));
+      trade.forEach(v => addEntry(vehKey(v), { cost: num(v.valuation), cash: 0, kind: 'parte_pago', ...when }));
     } else {
       purchasesCount++;
       if (total <= 0) purchasesWithoutCost++;
       totalInvestment += total - tradeTotal;
+      const cashFromTradeIns = trade.reduce((s, v) => s + cashInVehicle(v), 0);
       trade.forEach(v => addExit(vehKey(v)));
-      if (principal) addEntry(vehKey(principal), { cost: total, kind: 'compra', ...when });
+      if (principal) addEntry(vehKey(principal), { cost: total, cash: total - tradeTotal + cashFromTradeIns, kind: 'compra', ...when });
     }
   });
 
@@ -87,8 +112,9 @@ export const chainStats = (ops) => {
   });
 
   const currentHoldingValue = held.reduce((s, h) => s + h.cost, 0);
+  const heldCashValue = held.reduce((s, h) => s + h.cash, 0);
   const unsold = held.filter(h => h.kind === 'parte_pago');
-  const totalProfit = totalRevenue + currentHoldingValue - totalInvestment - totalCommission;
+  const totalProfit = totalRevenue + heldCashValue - totalInvestment - totalCommission;
 
   return {
     totalProfit,
@@ -96,6 +122,7 @@ export const chainStats = (ops) => {
     totalRevenue,
     totalCommission,
     currentHoldingValue,
+    heldCashValue,
     tradeInCount,
     unsoldTradeInValue: unsold.reduce((s, h) => s + h.cost, 0),
     unsoldTradeInCount: unsold.length,
