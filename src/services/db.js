@@ -450,10 +450,14 @@ export const db = {
     const lineage = resolveLineageCached(allOps);
     const roots = lineageRoots(allOps, lineage);
 
-    // 2. Operación de partida y su cadena.
-    const searchedOp =
-      (seedOpId && allOps.find(op => op.id === seedOpId)) ||
-      allOps.find(op => (op.vehicles || []).some(v => getVehId(v) === searchId));
+    // 2. Operación de partida y su cadena. Si se pidió una operación puntual y
+    //    no está en la lista, no se muestra otra con el mismo chasis: sería la
+    //    cadena de otro trato (pasaba al guardar una compra de un auto que ya
+    //    tenía otra cadena). La pantalla vuelve a pedir el árbol cuando la
+    //    lista se actualiza.
+    const searchedOp = seedOpId
+      ? allOps.find(op => op.id === seedOpId)
+      : allOps.find(op => (op.vehicles || []).some(v => getVehId(v) === searchId));
     if (!searchedOp) return { nodes: [], edges: [] };
     const targetRoot = roots.get(searchedOp.id);
     const relevantOps = allOps.filter(op => roots.get(op.id) === targetRoot);
