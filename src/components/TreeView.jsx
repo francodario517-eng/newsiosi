@@ -2,6 +2,7 @@ import React, { useMemo, useEffect, useState } from 'react';
 import ReactFlow, { Background, Controls, MiniMap, Handle, Position, ReactFlowProvider, useReactFlow } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { PlusCircle, Edit2, Pencil, Trash2, ArrowRightLeft, Copy, Check } from 'lucide-react';
+import { lastModification, creation } from '../services/audit';
 
 // Muestra "CHAPA: X" / "CHASIS: X" con un botón para copiar el valor al
 // portapapeles (stopPropagation evita arrastrar el nodo de ReactFlow al hacer click).
@@ -160,6 +161,24 @@ const VehicleNode = ({ data }) => {
           Asesor de Ventas: <span style={{ color: '#d1d5db' }}>{data.seller_name}</span>
         </div>
       )}
+
+      {(() => {
+        const alta = creation(data.raw_data);
+        const mod = lastModification(data.raw_data);
+        if (!(alta && alta.quien) && !mod) return null;
+        return (
+          <div style={{ marginBottom: '16px', color: 'var(--text-muted)', fontSize: '11px' }}>
+            {alta && alta.quien && (
+              <div>Cargó: <span style={{ color: '#d1d5db' }}>{alta.quien}</span> · {alta.cuando}</div>
+            )}
+            {mod && (
+              <div title="Última persona que modificó esta operación">
+                Últ. modificación: <span style={{ color: '#d1d5db' }}>{mod.quien}</span> · {mod.cuando}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
