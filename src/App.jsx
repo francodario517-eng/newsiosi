@@ -37,6 +37,7 @@ import { apifyService } from './services/apify'
 import { opTime, opType, marketKey, resolveLineageCached, lineageRoots } from './services/lineage'
 import { formatMoney, parseMoney } from './services/money'
 import { validateOperation } from './services/validation'
+import { latestLoaded, creation } from './services/audit'
 
 // Email autorizado a usar la Carga Rápida de datos financieros.
 const QUICKLOAD_EMAIL = 'francodario517@gmail.com'
@@ -1371,9 +1372,23 @@ function App() {
         )}
 
         <section className="animate-in">
+          {activeTab === 'operations' && (() => {
+            // La última operación cargada en toda la base (no la del filtro).
+            const ultima = latestLoaded(operations);
+            const alta = creation(ultima);
+            if (!ultima || !alta) return null;
+            return (
+              <div className="glass" style={{ padding: '10px 16px', borderRadius: '12px', marginBottom: '16px', fontSize: '13px', color: 'var(--text-muted)', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <span>Última operación cargada:</span>
+                <b style={{ color: 'white' }}>{ultima.buyer || 'sin cliente'}</b>
+                <span>({ultima.operation_type}{ultima.date ? `, ${ultima.date}` : ''})</span>
+                <span>· {alta.cuando}{alta.quien ? <> por <b style={{ color: 'white' }}>{alta.quien}</b></> : null}</span>
+              </div>
+            );
+          })()}
           {activeTab === 'operations' && (
             <div className="card glass">
-              <OperationsTable 
+              <OperationsTable
                 operations={filteredOperations} 
                 onSelectOperation={handleSelectOperation} 
                 onDeleteOperation={userProfile?.can_delete ? handleDeleteOperation : null}

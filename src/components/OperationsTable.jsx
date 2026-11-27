@@ -1,11 +1,36 @@
 import React from 'react';
 import { Eye, Calendar, Trash2, Pencil } from 'lucide-react';
+import { lastModification, creation } from '../services/audit';
+
+// Última modificación de la operación; si nadie la tocó después de cargarla, quién la cargó.
+function AuditCell({ op }) {
+  const mod = lastModification(op);
+  const alta = creation(op);
+  if (!mod && !(alta && alta.quien)) {
+    return <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>—</span>;
+  }
+  return (
+    <div style={{ fontSize: '12px', lineHeight: 1.4 }}>
+      {mod ? (
+        <div title="Última persona que modificó esta operación">
+          <span style={{ color: '#d1d5db', fontWeight: 600 }}>{mod.quien}</span>
+          <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>modificó · {mod.cuando}</div>
+        </div>
+      ) : (
+        <div title="Nadie la modificó después de cargarla">
+          <span style={{ color: '#d1d5db' }}>{alta.quien}</span>
+          <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>cargó · {alta.cuando}</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function OperationsTable({ operations, onSelectOperation, onDeleteOperation, onEditOperation }) {
   return (
     <div style={{ padding: '0' }}>
       <div className="table-container">
-        <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white', minWidth: '850px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white', minWidth: '1000px' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', background: 'rgba(255,255,255,0.02)' }}>
               <th style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fecha</th>
@@ -13,13 +38,14 @@ export function OperationsTable({ operations, onSelectOperation, onDeleteOperati
               <th style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cliente</th>
               <th style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monto</th>
               <th style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vehículos</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Últ. modificación</th>
               <th style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {operations.length === 0 ? (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
                   No se encontraron operaciones en este período.
                 </td>
               </tr>
@@ -68,6 +94,9 @@ export function OperationsTable({ operations, onSelectOperation, onDeleteOperati
                         </span>
                       ))}
                     </div>
+                  </td>
+                  <td style={{ padding: '16px 20px' }}>
+                    <AuditCell op={op} />
                   </td>
                   <td style={{ padding: '16px 20px' }}>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
